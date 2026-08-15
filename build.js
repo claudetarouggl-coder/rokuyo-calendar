@@ -5,6 +5,7 @@ const fs = require("fs");
 const path = require("path");
 const { makeConverter } = require("./lib/kyureki");
 const { isIchiryumanbai, isTenshabi } = require("./lib/kanshi");
+const { isFujoju } = require("./lib/fujoju");
 const { GOODS } = require("./lib/affiliates");
 
 const BASE = "https://claudetarouggl-coder.github.io/rokuyo-calendar/";
@@ -17,21 +18,6 @@ const TODAY_STR = `${TODAY.y}-${String(TODAY.m).padStart(2, "0")}-${String(TODAY
 
 const conv = makeConverter(2025, 2028);
 const WDAYS = ["日", "月", "火", "水", "木", "金", "土"];
-
-// 不成就日: 旧暦月+日で決まる8日周期の選日（閏月は元の月番号を使う）
-// 出典: fukucalendar.com / kokokara-manika.com（clndr.jpは月境界付近で1日ずれあり、少数派として不採用）
-const FUJOJUBI_TABLE = {
-  1: [3, 11, 19, 27], 7: [3, 11, 19, 27],
-  2: [2, 10, 18, 26], 8: [2, 10, 18, 26],
-  3: [1, 9, 17, 25], 9: [1, 9, 17, 25],
-  4: [4, 12, 20, 28], 10: [4, 12, 20, 28],
-  5: [5, 13, 21, 29], 11: [5, 13, 21, 29],
-  6: [6, 14, 22, 30], 12: [6, 14, 22, 30],
-};
-function isFujojubi(y, m, d) {
-  const c = conv(y, m, d);
-  return !!c && FUJOJUBI_TABLE[c.month].includes(c.day);
-}
 
 // 公開範囲: 2026年8月〜2027年12月（17ヶ月）
 const MONTHS = [];
@@ -46,7 +32,7 @@ const pad2 = n => String(n).padStart(2, "0");
 const monthPath = (y, m) => `${y}/${pad2(m)}/`;
 const ichiryuPath = y => `ichiryumanbai/${y}/`;
 const tenshaPath = y => `tensha/${y}/`;
-const fujojubiPath = y => `fujojubi/${y}/`;
+const fujojuPath = y => `fujojubi/${y}/`;
 const daysInMonth = (y, m) => new Date(Date.UTC(y, m, 0)).getUTCDate();
 const wdayOf = (y, m, d) => new Date(Date.UTC(y, m - 1, d)).getUTCDay();
 const lunarStrOf = c => `旧暦${c.leap ? "閏" : ""}${c.month}月${c.day}日`;
@@ -58,39 +44,45 @@ function monthRows(y, m) {
     const c = conv(y, m, d);
     rows.push({
       d, wday: wdayOf(y, m, d), rokuyo: c.rokuyo, lunarStr: lunarStrOf(c),
-      ichiryu: isIchiryumanbai(y, m, d), tensha: isTenshabi(y, m, d), fujojubi: isFujojubi(y, m, d),
+      ichiryu: isIchiryumanbai(y, m, d), tensha: isTenshabi(y, m, d), fujoju: isFujoju(y, m, d),
     });
   }
   return rows;
 }
-const remarkOf = r => [r.tensha ? "天赦" : "", r.ichiryu ? "一粒万倍" : "", r.fujojubi ? "不成就" : ""].filter(Boolean).join("・");
+const remarkOf = r => [r.tensha ? "天赦" : "", r.ichiryu ? "一粒万倍" : "", r.fujoju ? "不成就" : ""].filter(Boolean).join("・");
 
 const ALL_MONTHS_DATA = MONTHS.map(({ y, m }) => ({ y, m, rows: monthRows(y, m) }));
 
 // 一粒万倍日・天赦日 一覧（年別、月をまたいで全日走査）
 const ICHIRYU_BY_YEAR = {};
 const TENSHA_BY_YEAR = {};
-const FUJOJUBI_BY_YEAR = {};
+const FUJOJU_BY_YEAR = {};
 for (const y of [2026, 2027]) {
   ICHIRYU_BY_YEAR[y] = [];
   TENSHA_BY_YEAR[y] = [];
-  FUJOJUBI_BY_YEAR[y] = [];
+  FUJOJU_BY_YEAR[y] = [];
   for (let m = 1; m <= 12; m++) {
     const last = daysInMonth(y, m);
     for (let d = 1; d <= last; d++) {
       const wday = wdayOf(y, m, d);
       const rokuyo = conv(y, m, d).rokuyo;
-      const ichiryu = isIchiryumanbai(y, m, d), tensha = isTenshabi(y, m, d), fujojubi = isFujojubi(y, m, d);
+      const ichiryu = isIchiryumanbai(y, m, d), tensha = isTenshabi(y, m, d), fujoju = isFujoju(y, m, d);
       if (ichiryu) ICHIRYU_BY_YEAR[y].push({ m, d, wday, rokuyo, tensha });
       if (tensha) TENSHA_BY_YEAR[y].push({ m, d, wday, rokuyo, ichiryu });
-      if (fujojubi) FUJOJUBI_BY_YEAR[y].push({ m, d, wday, rokuyo, taian: rokuyo === "大安", ichiryu });
+      if (fujoju) FUJOJU_BY_YEAR[y].push({ m, d, wday, rokuyo, taian: rokuyo === "大安", ichiryu });
     }
   }
 }
 
-// トップページの「今日の六曜」用: 公開範囲全日の六曜だけを持つ軽量マップ
+// トップページの「今日の六曜」用: 公開範囲全日の六曜・備考（天赦/一粒万倍/不成就）を持つ軽量マップ
 const DAY_MAP = {};
-for (const { y, m, rows } of ALL_MONTHS_DATA) for (const r of rows) DAY_MAP[`${y}-${m}-${r.d}`] = r.rokuyo;
+const REMARK_MAP = {};
+for (const { y, m, rows } of ALL_MONTHS_DATA) for (const r of rows) {
+  const key = `${y}-${m}-${r.d}`;
+  DAY_MAP[key] = r.rokuyo;
+  const remark = remarkOf(r);
+  if (remark) REMARK_MAP[key] = remark;
+}
 
 // 大安一覧（年別）
 const TAIAN_BY_YEAR = {};
@@ -193,7 +185,8 @@ const guideLinks = depth => `<h2>あわせて読む</h2><div class="links">
 <a href="${rel(depth, "guide/imi/")}">六曜とは？意味と順番</a>
 <a href="${rel(depth, "guide/kekkonshiki/")}">仏滅・友引の結婚式はダメ？</a>
 <a href="${rel(depth, "guide/tomobiki/")}">友引に葬式を避けるのはなぜ？</a>
-<a href="${rel(depth, "guide/ichiryumanbai-imi/")}">一粒万倍日とは？やると良いこと・避けること</a></div>`;
+<a href="${rel(depth, "guide/ichiryumanbai-imi/")}">一粒万倍日とは？やると良いこと・避けること</a>
+<a href="${rel(depth, "fujojubi/")}">不成就日とは？由来と8日周期のルール</a></div>`;
 
 const taianLinks = depth => `<div class="links">
 <a href="${rel(depth, "taian/2026/")}">2026年の大安一覧</a>
@@ -206,8 +199,8 @@ const kichijitsuLinks = depth => `<div class="links">
 <a href="${rel(depth, ichiryuPath(2027))}">2027年の一粒万倍日一覧</a>
 <a href="${rel(depth, tenshaPath(2026))}">2026年の天赦日一覧</a>
 <a href="${rel(depth, tenshaPath(2027))}">2027年の天赦日一覧</a>
-<a href="${rel(depth, fujojubiPath(2026))}">2026年の不成就日一覧</a>
-<a href="${rel(depth, fujojubiPath(2027))}">2027年の不成就日一覧</a></div>`;
+<a href="${rel(depth, fujojuPath(2026))}">2026年の不成就日一覧</a>
+<a href="${rel(depth, fujojuPath(2027))}">2027年の不成就日一覧</a></div>`;
 
 function affiliateBlock(items, headline) {
   const html = items.map(g =>
@@ -242,7 +235,7 @@ function buildMonthPage(idx) {
 <div class="tbl"><table>
 <thead><tr><th>日付(曜日)</th><th>六曜</th><th>旧暦</th><th>備考</th></tr></thead>
 <tbody>${tableRows}</tbody></table></div>
-<p class="note">備考の「天赦」は<a href="${rel(2, tenshaPath(y))}">天赦日</a>、「一粒万倍」は<a href="${rel(2, ichiryuPath(y))}">一粒万倍日</a>、「不成就」は<a href="${rel(2, fujojubiPath(y))}">不成就日</a>を示します（複数該当する日もあります）。</p>
+<p class="note">備考の「天赦」は<a href="${rel(2, tenshaPath(y))}">天赦日</a>、「一粒万倍」は<a href="${rel(2, ichiryuPath(y))}">一粒万倍日</a>、「不成就」は<a href="${rel(2, fujojuPath(y))}">不成就日</a>を示します（複数該当する日もあります）。</p>
 <div style="display:flex;justify-content:space-between;margin:1rem 0">${prevNav}${nextNav}</div>
 <section class="faq"><h2>よくある質問</h2><dl>
 <dt>${m}月の大安はいつ？</dt><dd>${y}年${m}月の大安は${taianDays.map(d => `${d}日`).join("・")}です。</dd>
@@ -392,8 +385,8 @@ ${guideLinks(2)}`;
 }
 
 // ---- 不成就日一覧ページ ----
-function buildFujojubiPage(y) {
-  const list = FUJOJUBI_BY_YEAR[y].filter(it => y !== 2026 || it.m >= 8);
+function buildFujojuPage(y) {
+  const list = FUJOJU_BY_YEAR[y].filter(it => y !== 2026 || it.m >= 8);
   const byMonth = {};
   for (const it of list) (byMonth[it.m] = byMonth[it.m] || []).push(it);
 
@@ -416,11 +409,11 @@ function buildFujojubiPage(y) {
   }).join("\n");
 
   const body = `
-<section class="feature"><p>不成就日（ふじょうじゅび）は「何事も成就しない日」とされる選日（暦の吉凶を占う仕組みの一つ）で、結婚・開店・契約など新しく何かを始めるのには向かないとされています。旧暦の月と日から機械的に決まり、8日周期で月に4〜5回ほど巡ってくるとされています。${rangeNote}${overlapText}土日は太字で示しています。</p></section>
+<section class="feature"><p>不成就日（ふじょうじゅび）は「何事も成就しない日」とされる<a href="${rel(2, "fujojubi/")}">選日</a>（暦の吉凶を占う仕組みの一つ）で、結婚・開店・契約など新しく何かを始めるのには向かないとされています。旧暦の月と日から機械的に決まり、8日周期で月に4〜5回ほど巡ってくるとされています。${rangeNote}${overlapText}土日は太字で示しています。</p></section>
 <div class="tlist">${sections}</div>
 ${affiliateBlock(GOODS, "日取りに関わらず選びたいギフト・縁起物")}
 <section class="faq"><h2>よくある質問</h2><dl>
-<dt>不成就日とは？</dt><dd>「何事も成就しない日」とされる選日で、新しく何かを始めるのには向かないとされる暦注の一つです。</dd>
+<dt>不成就日とは？</dt><dd>「何事も成就しない日」とされる選日で、新しく何かを始めるのには向かないとされる暦注の一つです。詳しくは<a href="${rel(2, "fujojubi/")}">不成就日とは？由来と8日周期のルール</a>をご覧ください。</dd>
 <dt>不成就日は月に何回ある？</dt><dd>旧暦の月ごとに割り当てられた8日周期で巡ってくるため、月によって回数は変わりますが、おおむね4〜5回程度とされています。</dd>
 <dt>大安と重なったらどうする？</dt><dd>大安や一粒万倍日と不成就日が同じ日になることもあります。どちらを優先するかは考え方次第で、諸説あり気にしない方も多いとされています。</dd>
 </dl></section>
@@ -429,12 +422,36 @@ ${kichijitsuLinks(2)}
 <div class="links"><a href="${rel(2, "")}">月別カレンダーを見る</a></div>
 ${guideLinks(2)}`;
 
-  writePage(`${fujojubiPath(y)}index.html`, shell({
-    path: fujojubiPath(y), depth: 2,
+  writePage(`${fujojuPath(y)}index.html`, shell({
+    path: fujojuPath(y), depth: 2,
     title: `不成就日 ${y}年の一覧カレンダー｜大安と重なる日も`,
     desc: `${rangeNote}不成就日の日付を月別に一覧掲載。大安・一粒万倍日と重なる日もあわせて確認できます。`,
     h1: `不成就日 ${y}年の一覧カレンダー`,
-    breadcrumbs: [{ name: "六曜カレンダー", path: "" }, { name: `不成就日 ${y}年`, path: fujojubiPath(y) }],
+    breadcrumbs: [{ name: "六曜カレンダー", path: "" }, { name: `不成就日 ${y}年`, path: fujojuPath(y) }],
+    body,
+  }));
+}
+
+// ---- 不成就日 解説ページ ----
+function buildFujojuGuide() {
+  const body = `
+<section class="feature"><p>不成就日（ふじょうじゅび）は、選日（暦注の一種で、干支や五行などの体系とは別のルールで日の吉凶を占う仕組み）の一つとされています。婚礼・開店・契約など、新しく何かを始めるのには向かない日とされる一方、物事をやめる・区切りをつける用事には向くともいわれます。他の暦注と同様、科学的な根拠はないとされています。</p></section>
+<h2>由来</h2>
+<p>不成就日の由来ははっきりしないとされていますが、選日の一つとして古くから暦に記載されてきたとされています。「事が成就しない日」という字義のとおり、願いごとや新しい物事の始まりには不向きとされ、婚礼・開業・移転・契約など「事を起こす」場面で避けられることが多いといわれています。</p>
+<h2>8日周期のルール</h2>
+<p>不成就日は旧暦の月ごとに定められた8日周期で巡ってくるとされています。旧暦1月・7月は3・11・19・27日、2月・8月は2・10・18・26日、3月・9月は1・9・17・25日、4月・10月は4・12・20・28日、5月・11月は5・13・21・29日、6月・12月は6・14・22・30日が不成就日にあたるとされ、閏月は元の月と同じ日にちが使われます。月に4〜5回ほど巡ってくる計算になります。</p>
+<h2>一粒万倍日・天赦日と重なった場合</h2>
+<p>一粒万倍日や天赦日など「何かを始めるのに良い」とされる吉日と、不成就日が同じ日に重なることがあります。この場合、一般的には不成就日の「成就しない」という性質が優先され、吉日の効果が打ち消されるとされています。ただし、この解釈には諸説あり、必ずしも凶に転じるわけではないと考える立場もあります。気になる場合は日付をずらすなど、無理のない範囲で参考にするとよいとされています。</p>
+<h2>不成就日の日取りを確認する</h2>
+${kichijitsuLinks(1)}
+${guideLinks(1)}`;
+
+  writePage("fujojubi/index.html", shell({
+    path: "fujojubi/", depth: 1,
+    title: "不成就日とは？意味・由来と8日周期のルール",
+    desc: "不成就日（ふじょうじゅび）とは何かを解説。選日の一つとされる由来、旧暦の月ごとに決まる8日周期のルール、一粒万倍日・天赦日と重なった場合の一般的な解釈を紹介します。",
+    h1: "不成就日とは？",
+    breadcrumbs: [{ name: "六曜カレンダー", path: "" }, { name: "不成就日とは", path: "fujojubi/" }],
     body,
   }));
 }
@@ -526,7 +543,7 @@ ${guideLinks(2)}`);
 <li><strong>けんか・悪口などのトラブルごと</strong> — 悪いことも大きくなるとされるため、争いごとは避けたほうがよいという考え方があります。</li>
 </ul>
 <h2>他の吉日と重なるとどうなる？</h2>
-<p>一粒万倍日が<a href="${rel(2, tenshaPath(2026))}">天赦日</a>や<a href="${rel(2, "taian/2026/")}">大安</a>と重なる日は特に縁起が良いとされ、結婚式や開業日として選ぶ人が多い人気の日取りです。どの日が重なる日にあたるかは<a href="${rel(2, ichiryuPath(2026))}">2026年の一粒万倍日一覧</a>・<a href="${rel(2, ichiryuPath(2027))}">2027年の一粒万倍日一覧</a>で確認できます。一方、仏滅や<a href="${rel(2, fujojubiPath(2026))}">不成就日</a>（何事も成就しないとされる選日）と重なった場合にどちらを優先するかは考え方次第で、気にしない方も多いとされています。不成就日の日付は<a href="${rel(2, fujojubiPath(2026))}">2026年</a>・<a href="${rel(2, fujojubiPath(2027))}">2027年</a>の一覧から確認できます。</p>
+<p>一粒万倍日が<a href="${rel(2, tenshaPath(2026))}">天赦日</a>や<a href="${rel(2, "taian/2026/")}">大安</a>と重なる日は特に縁起が良いとされ、結婚式や開業日として選ぶ人が多い人気の日取りです。どの日が重なる日にあたるかは<a href="${rel(2, ichiryuPath(2026))}">2026年の一粒万倍日一覧</a>・<a href="${rel(2, ichiryuPath(2027))}">2027年の一粒万倍日一覧</a>で確認できます。一方、仏滅や<a href="${rel(2, "fujojubi/")}">不成就日</a>（何事も成就しないとされる選日）と重なった場合にどちらを優先するかは考え方次第で、気にしない方も多いとされています。不成就日の日付は<a href="${rel(2, fujojuPath(2026))}">2026年</a>・<a href="${rel(2, fujojuPath(2027))}">2027年</a>の一覧から確認できます。</p>
 <section class="faq"><h2>よくある質問</h2><dl>
 <dt>一粒万倍日は月に何回ありますか？</dt><dd>節切りの月ごとに十二支2つが割り当てられているため月によって異なりますが、おおむね4〜7回ほど巡ってくるとされています。</dd>
 <dt>一粒万倍日に納車してもいい？</dt><dd>新しい車が長く活躍することを願って選ぶ人が多く、納車日にも人気の吉日とされています。特に決まりはないため、大安や天赦日と重なる日を選ぶ方もいます。</dd>
@@ -545,8 +562,9 @@ function buildHome() {
   const todayConv = todayInRange ? conv(TODAY.y, TODAY.m, TODAY.d) : null;
   const todayMonthPath = todayInRange ? monthPath(TODAY.y, TODAY.m) : monthPath(MONTHS[0].y, MONTHS[0].m);
 
+  const todayRemark = todayInRange ? REMARK_MAP[todayKey] : null;
   const todayCardHtml = todayInRange
-    ? `<div class="lb">今日（${TODAY.y}年${TODAY.m}月${TODAY.d}日）の六曜</div><div class="vl" id="today-rokuyo">${esc(todayConv.rokuyo)}</div><div class="lb">${esc(lunarStrOf(todayConv))}・詳しくは<a href="${rel(0, todayMonthPath)}">${TODAY.y}年${TODAY.m}月のカレンダー</a></div>`
+    ? `<div class="lb">今日（${TODAY.y}年${TODAY.m}月${TODAY.d}日）の六曜</div><div class="vl" id="today-rokuyo">${esc(todayConv.rokuyo)}</div><div class="lb">${esc(lunarStrOf(todayConv))}${todayRemark ? `・${esc(todayRemark)}` : ""}・詳しくは<a href="${rel(0, todayMonthPath)}">${TODAY.y}年${TODAY.m}月のカレンダー</a></div>`
     : `<div class="lb" id="today-rokuyo">今日の六曜情報は公開期間外です</div><div class="lb">下記の月別ページからご確認ください</div>`;
 
   const yearGroups = [2026, 2027].map(y => {
@@ -577,6 +595,7 @@ ${guideLinks(0)}
 
   const script = `<script>
 var ROKUYO_MAP=${JSON.stringify(DAY_MAP)};
+var REMARK_MAP=${JSON.stringify(REMARK_MAP)};
 var MONTH_URL="${BASE}";
 (function(){
   var now=new Date(Date.now()+540*60000);
@@ -588,7 +607,8 @@ var MONTH_URL="${BASE}";
   if(Object.prototype.hasOwnProperty.call(ROKUYO_MAP,key)){
     var mm=(m<10?"0":"")+m;
     var url=MONTH_URL+y+"/"+mm+"/";
-    card.innerHTML='<div class="lb">今日（'+y+'年'+m+'月'+d+'日）の六曜</div><div class="vl">'+ROKUYO_MAP[key]+'</div><div class="lb">旧暦の日付は<a href="'+url+'">'+y+'年'+m+'月のカレンダー</a>でご確認いただけます</div>';
+    var remark=REMARK_MAP[key];
+    card.innerHTML='<div class="lb">今日（'+y+'年'+m+'月'+d+'日）の六曜</div><div class="vl">'+ROKUYO_MAP[key]+'</div><div class="lb">旧暦の日付は<a href="'+url+'">'+y+'年'+m+'月のカレンダー</a>でご確認いただけます'+(remark?'（'+remark+'）':'')+'</div>';
   }else{
     card.innerHTML='<div class="lb">今日の六曜情報は公開期間外です</div><div class="lb">下記の月別ページからご確認ください</div>';
   }
@@ -629,8 +649,9 @@ buildIchiryuPage(2026);
 buildIchiryuPage(2027);
 buildTenshaPage(2026);
 buildTenshaPage(2027);
-buildFujojubiPage(2026);
-buildFujojubiPage(2027);
+buildFujojuPage(2026);
+buildFujojuPage(2027);
+buildFujojuGuide();
 buildGuides();
 buildHome();
 build404();
@@ -642,7 +663,7 @@ for (const t of linkTargets) {
   const f = path.join(OUT, t, "index.html");
   if (!fs.existsSync(f)) throw new Error(`BROKEN LINK TARGET: ${t}`);
 }
-const expected = 1 + ALL_MONTHS_DATA.length + 2 + 4 + 2 + 4; // home + 月別17 + 大安一覧2 + 一粒万倍日/天赦日4 + 不成就日2 + ガイド4
+const expected = 1 + ALL_MONTHS_DATA.length + 2 + 4 + 3 + 4; // home + 月別17 + 大安一覧2 + 一粒万倍日/天赦日4 + 不成就日3(解説+年別2) + ガイド4
 if (emittedUrls.length !== expected) throw new Error(`page count ${emittedUrls.length} != ${expected}`);
 if (!emittedUrls.every(u => u.startsWith(BASE))) throw new Error("URL outside BASE");
 console.log(`OK: ${emittedUrls.length} pages + 404 + sitemap generated for ${TODAY_STR}`);
