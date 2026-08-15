@@ -7,7 +7,7 @@ const { makeConverter } = require("./lib/kyureki");
 const { GOODS } = require("./lib/affiliates");
 
 const BASE = "https://claudetarouggl-coder.github.io/rokuyo-calendar/";
-const GA_ID = "";
+const GA_ID = "G-P6NLJ3XZ7R";
 const OUT = path.join(__dirname, "docs");
 
 const jstNow = new Date(Date.now() + 540 * 60000);
