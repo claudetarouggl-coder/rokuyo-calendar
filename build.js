@@ -4,6 +4,7 @@
 const fs = require("fs");
 const path = require("path");
 const { makeConverter } = require("./lib/kyureki");
+const { isIchiryumanbai, isTenshabi } = require("./lib/kanshi");
 const { GOODS } = require("./lib/affiliates");
 
 const BASE = "https://claudetarouggl-coder.github.io/rokuyo-calendar/";
@@ -28,6 +29,8 @@ for (let y = 2026; y <= 2027; y++) {
 
 const pad2 = n => String(n).padStart(2, "0");
 const monthPath = (y, m) => `${y}/${pad2(m)}/`;
+const ichiryuPath = y => `ichiryumanbai/${y}/`;
+const tenshaPath = y => `tensha/${y}/`;
 const daysInMonth = (y, m) => new Date(Date.UTC(y, m, 0)).getUTCDate();
 const wdayOf = (y, m, d) => new Date(Date.UTC(y, m - 1, d)).getUTCDay();
 const lunarStrOf = c => `旧暦${c.leap ? "閏" : ""}${c.month}月${c.day}日`;
@@ -37,12 +40,33 @@ function monthRows(y, m) {
   const rows = [];
   for (let d = 1; d <= last; d++) {
     const c = conv(y, m, d);
-    rows.push({ d, wday: wdayOf(y, m, d), rokuyo: c.rokuyo, lunarStr: lunarStrOf(c) });
+    rows.push({
+      d, wday: wdayOf(y, m, d), rokuyo: c.rokuyo, lunarStr: lunarStrOf(c),
+      ichiryu: isIchiryumanbai(y, m, d), tensha: isTenshabi(y, m, d),
+    });
   }
   return rows;
 }
+const remarkOf = r => [r.tensha ? "天赦" : "", r.ichiryu ? "一粒万倍" : ""].filter(Boolean).join("・");
 
 const ALL_MONTHS_DATA = MONTHS.map(({ y, m }) => ({ y, m, rows: monthRows(y, m) }));
+
+// 一粒万倍日・天赦日 一覧（年別、月をまたいで全日走査）
+const ICHIRYU_BY_YEAR = {};
+const TENSHA_BY_YEAR = {};
+for (const y of [2026, 2027]) {
+  ICHIRYU_BY_YEAR[y] = [];
+  TENSHA_BY_YEAR[y] = [];
+  for (let m = 1; m <= 12; m++) {
+    const last = daysInMonth(y, m);
+    for (let d = 1; d <= last; d++) {
+      const wday = wdayOf(y, m, d);
+      const rokuyo = conv(y, m, d).rokuyo;
+      if (isIchiryumanbai(y, m, d)) ICHIRYU_BY_YEAR[y].push({ m, d, wday, rokuyo, tensha: isTenshabi(y, m, d) });
+      if (isTenshabi(y, m, d)) TENSHA_BY_YEAR[y].push({ m, d, wday, rokuyo, ichiryu: isIchiryumanbai(y, m, d) });
+    }
+  }
+}
 
 // トップページの「今日の六曜」用: 公開範囲全日の六曜だけを持つ軽量マップ
 const DAY_MAP = {};
@@ -154,6 +178,14 @@ const taianLinks = depth => `<div class="links">
 <a href="${rel(depth, "taian/2026/")}">2026年の大安一覧</a>
 <a href="${rel(depth, "taian/2027/")}">2027年の大安一覧</a></div>`;
 
+const kichijitsuLinks = depth => `<div class="links">
+<a href="${rel(depth, "taian/2026/")}">2026年の大安一覧</a>
+<a href="${rel(depth, "taian/2027/")}">2027年の大安一覧</a>
+<a href="${rel(depth, ichiryuPath(2026))}">2026年の一粒万倍日一覧</a>
+<a href="${rel(depth, ichiryuPath(2027))}">2027年の一粒万倍日一覧</a>
+<a href="${rel(depth, tenshaPath(2026))}">2026年の天赦日一覧</a>
+<a href="${rel(depth, tenshaPath(2027))}">2027年の天赦日一覧</a></div>`;
+
 function affiliateBlock(items, headline) {
   const html = items.map(g =>
     `<li><a href="${esc(g.url)}" rel="sponsored noopener" target="_blank">${esc(g.label)}</a> — ${esc(g.note)}</li>`).join("\n");
@@ -174,7 +206,7 @@ function buildMonthPage(idx) {
   const tableRows = rows.map(r => {
     const cls = [r.wday === 6 ? "sat" : r.wday === 0 ? "sun" : "", r.rokuyo === "大安" ? "taian" : ""]
       .filter(Boolean).join(" ");
-    return `<tr class="${cls}"><td>${r.d}日(${WDAYS[r.wday]})</td><td>${esc(r.rokuyo)}</td><td>${esc(r.lunarStr)}</td></tr>`;
+    return `<tr class="${cls}"><td>${r.d}日(${WDAYS[r.wday]})</td><td>${esc(r.rokuyo)}</td><td>${esc(r.lunarStr)}</td><td>${esc(remarkOf(r))}</td></tr>`;
   }).join("\n");
 
   const prevM = idx > 0 ? ALL_MONTHS_DATA[idx - 1] : null;
@@ -185,8 +217,9 @@ function buildMonthPage(idx) {
   const body = `
 <section class="feature"><p>${introText}</p></section>
 <div class="tbl"><table>
-<thead><tr><th>日付(曜日)</th><th>六曜</th><th>旧暦</th></tr></thead>
+<thead><tr><th>日付(曜日)</th><th>六曜</th><th>旧暦</th><th>備考</th></tr></thead>
 <tbody>${tableRows}</tbody></table></div>
+<p class="note">備考の「天赦」は<a href="${rel(2, tenshaPath(y))}">天赦日</a>、「一粒万倍」は<a href="${rel(2, ichiryuPath(y))}">一粒万倍日</a>を示します（両方に該当する日もあります）。</p>
 <div style="display:flex;justify-content:space-between;margin:1rem 0">${prevNav}${nextNav}</div>
 <section class="faq"><h2>よくある質問</h2><dl>
 <dt>${m}月の大安はいつ？</dt><dd>${y}年${m}月の大安は${taianDays.map(d => `${d}日`).join("・")}です。</dd>
@@ -242,6 +275,95 @@ ${guideLinks(2)}`;
     desc: `${rangeNote}結婚式・入籍・納車・引っ越しの日取りに人気の大安の日付を月別に一覧掲載。土日の大安もひと目でわかります。`,
     h1: `${y}年の大安一覧`,
     breadcrumbs: [{ name: "六曜カレンダー", path: "" }, { name: `${y}年の大安一覧`, path: `taian/${y}/` }],
+    body,
+  }));
+}
+
+// ---- 一粒万倍日一覧ページ ----
+function buildIchiryuPage(y) {
+  const list = ICHIRYU_BY_YEAR[y].filter(it => y !== 2026 || it.m >= 8);
+  const byMonth = {};
+  for (const it of list) (byMonth[it.m] = byMonth[it.m] || []).push(it);
+
+  const rangeNote = y === 2026
+    ? `2026年8月〜12月の一粒万倍日一覧です（当サイトの公開範囲にあわせています）。`
+    : `2027年の一粒万倍日一覧です。`;
+
+  const overlaps = list.filter(it => it.rokuyo === "大安" || it.tensha);
+  const overlapText = overlaps.length
+    ? `このうち${overlaps.map(it => `${it.m}月${it.d}日`).join("・")}は大安または天赦日と重なる「重なる日」で、特に縁起が良いとされています。`
+    : `この期間に大安・天赦日と重なる日はありません。`;
+
+  const sections = Object.keys(byMonth).map(m => {
+    const items = byMonth[m].map(it => {
+      const tags = [it.rokuyo === "大安" ? "大安" : "", it.tensha ? "天赦日" : ""].filter(Boolean);
+      const label = `${it.d}日（${WDAYS[it.wday]}）${esc(it.rokuyo)}${tags.length ? `・${tags.join("×")}と重なる日` : ""}`;
+      return it.wday === 0 || it.wday === 6 ? `<li><strong>${label}</strong></li>` : `<li>${label}</li>`;
+    }).join("\n");
+    return `<h3>${m}月</h3><ul>${items}</ul>`;
+  }).join("\n");
+
+  const body = `
+<section class="feature"><p>一粒万倍日（いちりゅうまんばいび）は「一粒の籾（もみ）が万倍の稲穂になる」ことに由来するとされる吉日で、節切りの月（立春を起点とする節月）ごとに定められた十二支の日に巡ってくるとされています。何かを始める日として縁起が良いとされる一方、借り物や人から借りたお金の返済は「万倍に増えて返ってくる」として避けたほうがよいとされています。${rangeNote}${overlapText}土日は太字で示しています。</p></section>
+<div class="tlist">${sections}</div>
+${affiliateBlock(GOODS, "一粒万倍日の日取りにあわせて選びたいギフト・縁起物")}
+<section class="faq"><h2>よくある質問</h2><dl>
+<dt>一粒万倍日とは？</dt><dd>「一粒の籾が万倍の稲穂に実る」ことにちなむ吉日で、何かを始めるのに良い日とされています。</dd>
+<dt>一粒万倍日は月に何回ある？</dt><dd>節切りの月ごとに十二支2つが割り当てられているため、月によって回数は変わりますが、おおむね4〜7回程度巡ってくるとされています。</dd>
+<dt>大安や天赦日と重なる日は？</dt><dd>${overlapText}</dd>
+</dl></section>
+<h2>あわせてチェック</h2>
+${kichijitsuLinks(2)}
+${guideLinks(2)}`;
+
+  writePage(`${ichiryuPath(y)}index.html`, shell({
+    path: ichiryuPath(y), depth: 2,
+    title: `一粒万倍日 ${y}年の一覧カレンダー｜大安と重なる日も`,
+    desc: `${rangeNote}一粒万倍日の日付を月別に一覧掲載。大安・天赦日と重なる「重なる日」もあわせて確認できます。`,
+    h1: `一粒万倍日 ${y}年の一覧カレンダー`,
+    breadcrumbs: [{ name: "六曜カレンダー", path: "" }, { name: `一粒万倍日 ${y}年`, path: ichiryuPath(y) }],
+    body,
+  }));
+}
+
+// ---- 天赦日一覧ページ ----
+function buildTenshaPage(y) {
+  const list = TENSHA_BY_YEAR[y].filter(it => y !== 2026 || it.m >= 8);
+
+  const rangeNote = y === 2026
+    ? `2026年8月〜12月の天赦日一覧です（当サイトの公開範囲にあわせています）。`
+    : `2027年の天赦日一覧です。`;
+
+  const overlaps = list.filter(it => it.rokuyo === "大安" || it.ichiryu);
+  const overlapText = overlaps.length
+    ? `このうち${overlaps.map(it => `${it.m}月${it.d}日`).join("・")}は大安または一粒万倍日と重なる「重なる日」で、特に縁起が良いとされています。`
+    : `この期間に大安・一粒万倍日と重なる日はありません。`;
+
+  const items = list.map(it => {
+    const tags = [it.rokuyo === "大安" ? "大安" : "", it.ichiryu ? "一粒万倍日" : ""].filter(Boolean);
+    const label = `${it.m}月${it.d}日（${WDAYS[it.wday]}）${esc(it.rokuyo)}${tags.length ? `・${tags.join("×")}と重なる日` : ""}`;
+    return it.wday === 0 || it.wday === 6 ? `<li><strong>${label}</strong></li>` : `<li>${label}</li>`;
+  }).join("\n");
+
+  const body = `
+<section class="feature"><p>天赦日（てんしゃにち）は「天が万物の罪を赦す日」に由来するとされる、暦の中でも最上の吉日とされています。節切りの季節ごとに、立春〜立夏前日は戊寅（つちのえとら）、立夏〜立秋前日は甲午（きのえうま）、立秋〜立冬前日は戊申（つちのえさる）、立冬〜立春前日は甲子（きのえね）の日が天赦日にあたるとされ、年に5〜6回ほど巡ってきます。${rangeNote}${overlapText}土日は太字で示しています。</p></section>
+<div class="tlist"><ul>${items}</ul></div>
+${affiliateBlock(GOODS, "天赦日の日取りにあわせて選びたいギフト・縁起物")}
+<section class="faq"><h2>よくある質問</h2><dl>
+<dt>天赦日とは？</dt><dd>季節ごとに定められた干支の日で、暦の吉日の中でも最上のものとされています。</dd>
+<dt>天赦日は年に何回ある？</dt><dd>年によって異なりますが、5〜6回程度巡ってくるとされています。</dd>
+<dt>一粒万倍日や大安と重なる日は？</dt><dd>${overlapText}</dd>
+</dl></section>
+<h2>あわせてチェック</h2>
+${kichijitsuLinks(2)}
+${guideLinks(2)}`;
+
+  writePage(`${tenshaPath(y)}index.html`, shell({
+    path: tenshaPath(y), depth: 2,
+    title: `天赦日 ${y}年はいつ？一覧と六曜`,
+    desc: `${rangeNote}天赦日の日付を六曜つきで一覧掲載。大安・一粒万倍日と重なる「重なる日」もあわせて確認できます。`,
+    h1: `天赦日 ${y}年はいつ？`,
+    breadcrumbs: [{ name: "六曜カレンダー", path: "" }, { name: `天赦日 ${y}年`, path: tenshaPath(y) }],
     body,
   }));
 }
@@ -335,12 +457,13 @@ function buildHome() {
 <section class="feature"><p>六曜（大安・友引・先勝・先負・仏滅・赤口）と旧暦を、2026年8月〜2027年12月の期間で日別に確認できるカレンダーサイトです。結婚式・入籍・納車・引っ越しなど、日取りを選ぶ際の参考にご利用ください。</p></section>
 <h2>月別カレンダー</h2>
 ${yearGroups}
-<h2>大安の日取りを年間でチェック</h2>
-${taianLinks(0)}
+<h2>大安・一粒万倍日・天赦日を年間でチェック</h2>
+${kichijitsuLinks(0)}
 ${guideLinks(0)}
 <section class="faq"><h2>よくある質問</h2><dl>
 <dt>今日の六曜がすぐ知りたい</dt><dd>このページ上部の「今日の六曜」カードでご確認いただけます。</dd>
 <dt>大安の日取りを探したい</dt><dd><a href="${rel(0, "taian/2026/")}">2026年の大安一覧</a>・<a href="${rel(0, "taian/2027/")}">2027年の大安一覧</a>から月別に確認できます。</dd>
+<dt>一粒万倍日・天赦日の日取りを探したい</dt><dd><a href="${rel(0, ichiryuPath(2026))}">一粒万倍日 2026年</a>・<a href="${rel(0, ichiryuPath(2027))}">2027年</a>、<a href="${rel(0, tenshaPath(2026))}">天赦日 2026年</a>・<a href="${rel(0, tenshaPath(2027))}">2027年</a>の一覧から確認できます。</dd>
 <dt>六曜の意味を知りたい</dt><dd><a href="${rel(0, "guide/imi/")}">六曜とは？意味と順番</a>で、それぞれの意味と決まり方を解説しています。</dd>
 </dl></section>`;
 
@@ -399,6 +522,10 @@ fs.rmSync(OUT, { recursive: true, force: true });
 ALL_MONTHS_DATA.forEach((_, i) => buildMonthPage(i));
 buildTaianPage(2026);
 buildTaianPage(2027);
+buildIchiryuPage(2026);
+buildIchiryuPage(2027);
+buildTenshaPage(2026);
+buildTenshaPage(2027);
 buildGuides();
 buildHome();
 build404();
@@ -410,7 +537,7 @@ for (const t of linkTargets) {
   const f = path.join(OUT, t, "index.html");
   if (!fs.existsSync(f)) throw new Error(`BROKEN LINK TARGET: ${t}`);
 }
-const expected = 1 + ALL_MONTHS_DATA.length + 2 + 3; // home + 月別17 + 大安一覧2 + ガイド3
+const expected = 1 + ALL_MONTHS_DATA.length + 2 + 4 + 3; // home + 月別17 + 大安一覧2 + 一粒万倍日/天赦日4 + ガイド3
 if (emittedUrls.length !== expected) throw new Error(`page count ${emittedUrls.length} != ${expected}`);
 if (!emittedUrls.every(u => u.startsWith(BASE))) throw new Error("URL outside BASE");
 console.log(`OK: ${emittedUrls.length} pages + 404 + sitemap generated for ${TODAY_STR}`);
