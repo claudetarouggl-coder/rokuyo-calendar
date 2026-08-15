@@ -172,7 +172,8 @@ function writePage(relPath, html) {
 const guideLinks = depth => `<h2>あわせて読む</h2><div class="links">
 <a href="${rel(depth, "guide/imi/")}">六曜とは？意味と順番</a>
 <a href="${rel(depth, "guide/kekkonshiki/")}">仏滅・友引の結婚式はダメ？</a>
-<a href="${rel(depth, "guide/tomobiki/")}">友引に葬式を避けるのはなぜ？</a></div>`;
+<a href="${rel(depth, "guide/tomobiki/")}">友引に葬式を避けるのはなぜ？</a>
+<a href="${rel(depth, "guide/ichiryumanbai-imi/")}">一粒万倍日とは？やると良いこと・避けること</a></div>`;
 
 const taianLinks = depth => `<div class="links">
 <a href="${rel(depth, "taian/2026/")}">2026年の大安一覧</a>
@@ -433,6 +434,38 @@ ${guideLinks(2)}`);
 <h2>宗教的な根拠はない</h2>
 <p>仏教の教えの中に「友引に葬式をしてはいけない」という決まりはなく、六曜自体、仏教とは無関係な暦注とされています。実際、浄土真宗などでは六曜を迷信として気にしない考え方をとる寺院もあります。菩提寺がある場合は、事前に六曜についての考え方を確認しておくと安心です。</p>
 ${guideLinks(2)}`);
+
+  buildGuide("ichiryumanbai-imi",
+    "一粒万倍日とは？やると良いこと・避けること一覧",
+    "一粒万倍日とは何をする日かを解説。財布の新調・開業・入籍・宝くじ購入などやると良いとされることと、借金の契約やお金の貸し借りなど避けたほうがいいとされることを一覧で紹介。天赦日や大安と重なる日、仏滅と重なった場合の考え方もあわせて解説します。",
+    "一粒万倍日とは？やると良いこと・避けること", `
+<section class="feature"><p>一粒万倍日（いちりゅうまんばいび）は「一粒の籾（もみ）が万倍に実る」という意味を持つ選日（暦の吉日の一種）で、始めたことが大きく育つ日とされています。節切りの月ごとに十二支の日が割り当てられているため月に4〜7回ほど巡ってきて、吉日の中では比較的頻度が高いのが特徴です。</p></section>
+<h2>やると良いとされること</h2>
+<ul>
+<li><strong>財布の新調・使い始め</strong> — 新しい財布を使い始めると、お金が増えて返ってくることを願う縁起担ぎとされています。</li>
+<li><strong>開業・開店・新しい仕事のスタート</strong> — 始めた仕事が大きく育つことを願って、開業日に選ぶ人が多いとされています。</li>
+<li><strong>銀行口座の開設・投資や貯金の開始</strong> — 口座開設や積立の開始日に選ぶと、資産が増えていくことを願う意味合いがあるとされています。</li>
+<li><strong>宝くじの購入</strong> — 当選金が万倍に増えることを願って、購入日に選ぶ人が多いとされています。</li>
+<li><strong>入籍・プロポーズ</strong> — 二人の幸せが大きく育つことを願って選ばれる日取りの一つとされています。</li>
+<li><strong>引っ越し・契約ごと</strong> — 新生活や新しい契約が良い方向に発展することを願って選ばれるとされています。</li>
+</ul>
+<h2>避けたほうがいいとされること</h2>
+<ul>
+<li><strong>借金・ローンの契約</strong> — お金だけでなく苦労や負債も万倍に増えてしまうという言い伝えから、避けたほうがよいとされています。</li>
+<li><strong>人からお金や物を借りる</strong> — 借りたものが万倍になって返ってくる、つまり返済の負担が増えると考えられ、避ける方が多いとされています。</li>
+<li><strong>けんか・悪口などのトラブルごと</strong> — 悪いことも大きくなるとされるため、争いごとは避けたほうがよいという考え方があります。</li>
+</ul>
+<h2>他の吉日と重なるとどうなる？</h2>
+<p>一粒万倍日が<a href="${rel(2, tenshaPath(2026))}">天赦日</a>や<a href="${rel(2, "taian/2026/")}">大安</a>と重なる日は特に縁起が良いとされ、結婚式や開業日として選ぶ人が多い人気の日取りです。どの日が重なる日にあたるかは<a href="${rel(2, ichiryuPath(2026))}">2026年の一粒万倍日一覧</a>・<a href="${rel(2, ichiryuPath(2027))}">2027年の一粒万倍日一覧</a>で確認できます。一方、仏滅や不成就日（成就しないとされる選日で、当サイトでは扱っていません）と重なった場合にどちらを優先するかは考え方次第で、気にしない方も多いとされています。</p>
+<section class="faq"><h2>よくある質問</h2><dl>
+<dt>一粒万倍日は月に何回ありますか？</dt><dd>節切りの月ごとに十二支2つが割り当てられているため月によって異なりますが、おおむね4〜7回ほど巡ってくるとされています。</dd>
+<dt>一粒万倍日に納車してもいい？</dt><dd>新しい車が長く活躍することを願って選ぶ人が多く、納車日にも人気の吉日とされています。特に決まりはないため、大安や天赦日と重なる日を選ぶ方もいます。</dd>
+<dt>仏滅と重なった日はどうすれば？</dt><dd>一粒万倍日と仏滅が重なった場合、どちらを優先するかは考え方次第とされています。始めごとを重視して一粒万倍日を優先する方もいれば、仏滅を避けて別日にする方もいます。</dd>
+</dl></section>
+${affiliateBlock(GOODS, "一粒万倍日に合わせて選びたいギフト・縁起物")}
+<h2>あわせてチェック</h2>
+${kichijitsuLinks(2)}
+${guideLinks(2)}`);
 }
 
 // ---- トップページ ----
@@ -537,7 +570,7 @@ for (const t of linkTargets) {
   const f = path.join(OUT, t, "index.html");
   if (!fs.existsSync(f)) throw new Error(`BROKEN LINK TARGET: ${t}`);
 }
-const expected = 1 + ALL_MONTHS_DATA.length + 2 + 4 + 3; // home + 月別17 + 大安一覧2 + 一粒万倍日/天赦日4 + ガイド3
+const expected = 1 + ALL_MONTHS_DATA.length + 2 + 4 + 4; // home + 月別17 + 大安一覧2 + 一粒万倍日/天赦日4 + ガイド4
 if (emittedUrls.length !== expected) throw new Error(`page count ${emittedUrls.length} != ${expected}`);
 if (!emittedUrls.every(u => u.startsWith(BASE))) throw new Error("URL outside BASE");
 console.log(`OK: ${emittedUrls.length} pages + 404 + sitemap generated for ${TODAY_STR}`);
