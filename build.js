@@ -6,6 +6,7 @@ const path = require("path");
 const { makeConverter } = require("./lib/kyureki");
 const { isIchiryumanbai, isTenshabi } = require("./lib/kanshi");
 const { isFujoju } = require("./lib/fujoju");
+const { holidaysOf } = require("./lib/shukujitsu");
 const { GOODS, MOON_GOODS, SAIKYOBI_GOODS } = require("./lib/affiliates");
 
 const BASE = "https://claudetarouggl-coder.github.io/rokuyo-calendar/";
@@ -35,6 +36,7 @@ const tenshaPath = y => `tensha/${y}/`;
 const fujojuPath = y => `fujojubi/${y}/`;
 const meigetsuPath = "meigetsu/";
 const saikyobiPath = "saikyobi/";
+const shukujitsuPath = "shukujitsu/";
 const daysInMonth = (y, m) => new Date(Date.UTC(y, m, 0)).getUTCDate();
 const wdayOf = (y, m, d) => new Date(Date.UTC(y, m - 1, d)).getUTCDay();
 const lunarStrOf = c => `旧暦${c.leap ? "閏" : ""}${c.month}月${c.day}日`;
@@ -133,6 +135,14 @@ for (const { y, m, rows } of ALL_MONTHS_DATA) for (const r of rows) {
   DAY_MAP[key] = r.rokuyo;
   const remark = remarkOf(r);
   if (remark) REMARK_MAP[key] = remark;
+}
+
+// 祝日・休日一覧（年別、六曜つき）
+const SHUKUJITSU_BY_YEAR = {};
+for (const y of [2026, 2027]) {
+  SHUKUJITSU_BY_YEAR[y] = holidaysOf(y).map(h => ({
+    ...h, wday: wdayOf(h.y, h.m, h.d), rokuyo: conv(h.y, h.m, h.d).rokuyo,
+  }));
 }
 
 // 大安一覧（年別）
@@ -239,7 +249,8 @@ const guideLinks = depth => `<h2>あわせて読む</h2><div class="links">
 <a href="${rel(depth, "guide/ichiryumanbai-imi/")}">一粒万倍日とは？やると良いこと・避けること</a>
 <a href="${rel(depth, "fujojubi/")}">不成就日とは？由来と8日周期のルール</a>
 <a href="${rel(depth, meigetsuPath)}">中秋の名月はいつ？十五夜・十三夜の日付</a>
-<a href="${rel(depth, saikyobiPath)}">最強開運日はいつ？天赦日と一粒万倍日が重なる日</a></div>`;
+<a href="${rel(depth, saikyobiPath)}">最強開運日はいつ？天赦日と一粒万倍日が重なる日</a>
+<a href="${rel(depth, shukujitsuPath)}">祝日カレンダー｜振替休日・連休一覧</a></div>`;
 
 const taianLinks = depth => `<div class="links">
 <a href="${rel(depth, "taian/2026/")}">2026年の大安一覧</a>
@@ -623,6 +634,64 @@ ${guideLinks(1)}`;
   }));
 }
 
+// ---- 祝日カレンダーページ ----
+function buildShukujitsuGuide() {
+  const monthPublished = (y, m) => MONTHS.some(mo => mo.y === y && mo.m === m);
+  const cnt = (list, type) => list.filter(h => h.type === type).length;
+  const l26 = SHUKUJITSU_BY_YEAR[2026], l27 = SHUKUJITSU_BY_YEAR[2027];
+
+  const yearTable = y => {
+    const list = SHUKUJITSU_BY_YEAR[y];
+    const rows = list.map(h => {
+      const label = `${h.m}月${h.d}日(${WDAYS[h.wday]})`;
+      const dateCell = monthPublished(h.y, h.m) ? `<a href="${rel(1, monthPath(h.y, h.m))}">${label}</a>` : label;
+      const cls = h.wday === 6 ? "sat" : h.wday === 0 ? "sun" : "";
+      return `<tr class="${cls}"><td>${dateCell}</td><td>${esc(h.name)}</td><td>${esc(h.rokuyo)}</td></tr>`;
+    }).join("\n");
+    return `<h2>${y}年の祝日・休日一覧（${list.length}日）</h2><div class="tbl"><table><thead><tr><th>日付(曜日)</th><th>祝日名</th><th>六曜</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  };
+
+  const introText = `2026年は祝日${cnt(l26, "祝日")}日に振替休日${cnt(l26, "振替休日")}日・国民の休日${cnt(l26, "国民の休日")}日を加えた計${l26.length}日、`
+    + `2027年は祝日${cnt(l27, "祝日")}日に振替休日${cnt(l27, "振替休日")}日を加えた計${l27.length}日が「国民の祝日に関する法律」に基づく休日です。`
+    + `月別ページへのリンクからは、その日の六曜（大安・友引など）もあわせて確認できます。`;
+
+  const sw = [19, 20, 21, 22, 23].map(d => ({ d, wday: wdayOf(2026, 9, d) }));
+  const swLabel = sw.map(x => `${x.d}日(${WDAYS[x.wday]})`).join("・");
+  const gw = [1, 2, 3, 4, 5].map(d => ({ d, wday: wdayOf(2027, 5, d) }));
+  const gwLabel = gw.map(x => `${x.d}日(${WDAYS[x.wday]})`).join("・");
+
+  const body = `
+<section class="feature"><p>${introText}</p></section>
+${yearTable(2026)}
+${yearTable(2027)}
+<h2>シルバーウィーク2026はいつ？9月${swLabel}の5連休</h2>
+<p>2026年は9月19日(土)・20日(日)の週末に続けて、21日(月)<a href="${rel(1, monthPath(2026, 9))}">敬老の日</a>、22日(火)国民の休日、23日(水)秋分の日と祝日が3日連続します。間に平日を挟まないため、9月${swLabel}が5連休になります。この並びは「国民の休日」（後述）によって敬老の日と秋分の日の間の平日が休日になることで生まれています。祝日・休日は<a href="${rel(1, monthPath(2026, 9))}">2026年9月のカレンダー</a>で日別の六曜とあわせて確認できます。</p>
+<h2>ゴールデンウィーク2027は5月${gwLabel}</h2>
+<p>2027年のゴールデンウィークは、5月1日(土)・2日(日)の週末に憲法記念日（5月3日）・みどりの日（5月4日）・こどもの日（5月5日）が続き、5月${gwLabel}の5連休になります。憲法記念日が日曜日ではないため振替休日は発生しません。詳しくは<a href="${rel(1, monthPath(2027, 5))}">2027年5月のカレンダー</a>をご覧ください。</p>
+<p>年末年始は、2026年12月31日(木)を挟んで2027年1月1日(金)が元日、2日(土)・3日(日)と続くため、大型連休というよりは3連休程度の並びになります。</p>
+<h2>振替休日とは</h2>
+<p>振替休日は、祝日が日曜日にあたった場合に、その直後で最初に祝日ではない日を休日とする制度です（祝日法第3条第2項）。2026年は5月3日の憲法記念日が日曜日にあたるため、5月4日・5日は他の祝日（みどりの日・こどもの日）ですでに埋まっており、その次の5月6日が振替休日になります。2027年は3月21日の春分の日が日曜日にあたるため、翌3月22日が振替休日です。</p>
+<h2>国民の休日とは</h2>
+<p>国民の休日は、前日と翌日をともに祝日に挟まれた、祝日でも日曜日でもない平日を休日とする制度です（祝日法第3条第3項）。2026年は9月21日の敬老の日と9月23日の秋分の日に挟まれた9月22日が該当し、国民の休日になります。ハッピーマンデー制度で敬老の日が9月第3月曜に固定された結果、秋分の日（毎年9月22日か23日ごろ）との位置関係次第で発生する、シルバーウィーク特有の休日です。</p>
+<section class="note"><p>祝日は「国民の祝日に関する法律」に基づきます。春分の日・秋分の日は当サイトの天文計算（太陽の黄経が0°・180°になる瞬間）で算出していますが、法律上は前年2月の閣議決定・暦要項の官報公告により正式に確定します。2026年・2027年分は、いずれも官報で確定済みの日付と一致することを確認済みです。</p></section>
+<section class="faq"><h2>よくある質問</h2><dl>
+<dt>2026年のシルバーウィークはいつ？</dt><dd>9月${swLabel}の5連休です。敬老の日・国民の休日・秋分の日が3日連続することで生まれます。</dd>
+<dt>国民の休日と振替休日の違いは？</dt><dd>振替休日は祝日が日曜日と重なったときの繰り替え、国民の休日は2つの祝日に挟まれた平日が休日になる制度です。どちらも祝日法に基づきます。</dd>
+<dt>2027年のゴールデンウィークは何連休？</dt><dd>5月1日(土)〜5日(水)の5連休です。祝日が日曜日と重ならないため振替休日は発生しません。</dd>
+</dl></section>
+${kichijitsuLinks(1)}
+${guideLinks(1)}`;
+
+  writePage(`${shukujitsuPath}index.html`, shell({
+    path: shukujitsuPath, depth: 1,
+    title: "祝日カレンダー【2026年・2027年】振替休日・連休一覧",
+    desc: `2026年・2027年の祝日・休日を六曜つきで一覧掲載。9月${swLabel}のシルバーウィーク2026、5月${gwLabel}のゴールデンウィーク2027、振替休日・国民の休日の仕組みをわかりやすく解説します。`,
+    h1: "祝日カレンダー｜振替休日・連休一覧",
+    breadcrumbs: [{ name: "六曜カレンダー", path: "" }, { name: "祝日カレンダー", path: shukujitsuPath }],
+    body,
+  }));
+}
+
 // ---- ガイドページ ----
 function buildGuide(slug, title, descText, h1, bodyHtml) {
   writePage(`guide/${slug}/index.html`, shell({
@@ -821,6 +890,7 @@ buildFujojuPage(2027);
 buildFujojuGuide();
 buildMeigetsuGuide();
 buildSaikyobiGuide();
+buildShukujitsuGuide();
 buildGuides();
 buildHome();
 build404();
@@ -832,7 +902,7 @@ for (const t of linkTargets) {
   const f = path.join(OUT, t, "index.html");
   if (!fs.existsSync(f)) throw new Error(`BROKEN LINK TARGET: ${t}`);
 }
-const expected = 1 + ALL_MONTHS_DATA.length + 2 + 4 + 3 + 1 + 1 + 4; // home + 月別17 + 大安一覧2 + 一粒万倍日/天赦日4 + 不成就日3(解説+年別2) + 中秋の名月1 + 最強開運日1 + ガイド4
+const expected = 1 + ALL_MONTHS_DATA.length + 2 + 4 + 3 + 1 + 1 + 1 + 4; // home + 月別17 + 大安一覧2 + 一粒万倍日/天赦日4 + 不成就日3(解説+年別2) + 中秋の名月1 + 最強開運日1 + 祝日カレンダー1 + ガイド4
 if (emittedUrls.length !== expected) throw new Error(`page count ${emittedUrls.length} != ${expected}`);
 if (!emittedUrls.every(u => u.startsWith(BASE))) throw new Error("URL outside BASE");
 console.log(`OK: ${emittedUrls.length} pages + 404 + sitemap generated for ${TODAY_STR}`);
