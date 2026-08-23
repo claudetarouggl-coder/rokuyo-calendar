@@ -6,7 +6,7 @@ const path = require("path");
 const { makeConverter } = require("./lib/kyureki");
 const { isIchiryumanbai, isTenshabi } = require("./lib/kanshi");
 const { isFujoju } = require("./lib/fujoju");
-const { GOODS, MOON_GOODS } = require("./lib/affiliates");
+const { GOODS, MOON_GOODS, SAIKYOBI_GOODS } = require("./lib/affiliates");
 
 const BASE = "https://claudetarouggl-coder.github.io/rokuyo-calendar/";
 const GA_ID = "G-P6NLJ3XZ7R";
@@ -34,6 +34,7 @@ const ichiryuPath = y => `ichiryumanbai/${y}/`;
 const tenshaPath = y => `tensha/${y}/`;
 const fujojuPath = y => `fujojubi/${y}/`;
 const meigetsuPath = "meigetsu/";
+const saikyobiPath = "saikyobi/";
 const daysInMonth = (y, m) => new Date(Date.UTC(y, m, 0)).getUTCDate();
 const wdayOf = (y, m, d) => new Date(Date.UTC(y, m - 1, d)).getUTCDay();
 const lunarStrOf = c => `旧暦${c.leap ? "閏" : ""}${c.month}月${c.day}日`;
@@ -78,10 +79,12 @@ const ALL_MONTHS_DATA = MONTHS.map(({ y, m }) => ({ y, m, rows: monthRows(y, m) 
 const ICHIRYU_BY_YEAR = {};
 const TENSHA_BY_YEAR = {};
 const FUJOJU_BY_YEAR = {};
+const SAIKYOBI_BY_YEAR = {};
 for (const y of [2026, 2027]) {
   ICHIRYU_BY_YEAR[y] = [];
   TENSHA_BY_YEAR[y] = [];
   FUJOJU_BY_YEAR[y] = [];
+  SAIKYOBI_BY_YEAR[y] = [];
   for (let m = 1; m <= 12; m++) {
     const last = daysInMonth(y, m);
     for (let d = 1; d <= last; d++) {
@@ -91,8 +94,35 @@ for (const y of [2026, 2027]) {
       if (ichiryu) ICHIRYU_BY_YEAR[y].push({ m, d, wday, rokuyo, tensha });
       if (tensha) TENSHA_BY_YEAR[y].push({ m, d, wday, rokuyo, ichiryu });
       if (fujoju) FUJOJU_BY_YEAR[y].push({ m, d, wday, rokuyo, taian: rokuyo === "大安", ichiryu });
+      if (tensha && ichiryu) SAIKYOBI_BY_YEAR[y].push({ m, d, wday, rokuyo, fujoju });
     }
   }
+}
+
+// 最強開運日（天赦日×一粒万倍日）: 事前検証済みの正解と一致するかを検証する
+// 出典: 池田工芸・kaiunya.jp 等複数メディアと2026年分は照合済み
+const SAIKYOBI_EXPECTED = {
+  2026: [[3, 5], [7, 19], [10, 1], [12, 16]],
+  2027: [[7, 14], [9, 26], [12, 11]],
+};
+for (const y of [2026, 2027]) {
+  const got = SAIKYOBI_BY_YEAR[y].map(it => [it.m, it.d]);
+  if (JSON.stringify(got) !== JSON.stringify(SAIKYOBI_EXPECTED[y])) {
+    throw new Error(`saikyobi mismatch for ${y}: got ${JSON.stringify(got)}, want ${JSON.stringify(SAIKYOBI_EXPECTED[y])}`);
+  }
+}
+const SAIKYOBI_FUJOJU_OVERLAP_EXPECTED = [[2026, 7, 19], [2027, 9, 26]];
+const saikyobiFujojuOverlapGot = [];
+for (const y of [2026, 2027]) for (const it of SAIKYOBI_BY_YEAR[y]) if (it.fujoju) saikyobiFujojuOverlapGot.push([y, it.m, it.d]);
+if (JSON.stringify(saikyobiFujojuOverlapGot) !== JSON.stringify(SAIKYOBI_FUJOJU_OVERLAP_EXPECTED)) {
+  throw new Error(`saikyobi fujoju overlap mismatch: got ${JSON.stringify(saikyobiFujojuOverlapGot)}, want ${JSON.stringify(SAIKYOBI_FUJOJU_OVERLAP_EXPECTED)}`);
+}
+
+// 月別ページに「この月の最強開運日」マーカーを出すための逆引きマップ
+const SAIKYOBI_MONTH_MAP = {};
+for (const y of [2026, 2027]) for (const it of SAIKYOBI_BY_YEAR[y]) {
+  const key = `${y}-${it.m}`;
+  (SAIKYOBI_MONTH_MAP[key] = SAIKYOBI_MONTH_MAP[key] || []).push(it.d);
 }
 
 // トップページの「今日の六曜」用: 公開範囲全日の六曜・備考（天赦/一粒万倍/不成就）を持つ軽量マップ
@@ -208,7 +238,8 @@ const guideLinks = depth => `<h2>あわせて読む</h2><div class="links">
 <a href="${rel(depth, "guide/tomobiki/")}">友引に葬式を避けるのはなぜ？</a>
 <a href="${rel(depth, "guide/ichiryumanbai-imi/")}">一粒万倍日とは？やると良いこと・避けること</a>
 <a href="${rel(depth, "fujojubi/")}">不成就日とは？由来と8日周期のルール</a>
-<a href="${rel(depth, meigetsuPath)}">中秋の名月はいつ？十五夜・十三夜の日付</a></div>`;
+<a href="${rel(depth, meigetsuPath)}">中秋の名月はいつ？十五夜・十三夜の日付</a>
+<a href="${rel(depth, saikyobiPath)}">最強開運日はいつ？天赦日と一粒万倍日が重なる日</a></div>`;
 
 const taianLinks = depth => `<div class="links">
 <a href="${rel(depth, "taian/2026/")}">2026年の大安一覧</a>
@@ -252,6 +283,11 @@ function buildMonthPage(idx) {
     ? `<p class="note"><a href="${rel(2, meigetsuPath)}">${y}年の中秋の名月・十三夜はいつ？</a>もあわせてご覧ください。</p>`
     : "";
 
+  const saikyobiDays = SAIKYOBI_MONTH_MAP[`${y}-${m}`];
+  const saikyobiNote = saikyobiDays
+    ? `<p class="note">この月の${saikyobiDays.map(d => `${d}日`).join("・")}は天赦日と一粒万倍日が重なる<a href="${rel(2, saikyobiPath)}">最強開運日</a>です。</p>`
+    : "";
+
   const prevM = idx > 0 ? ALL_MONTHS_DATA[idx - 1] : null;
   const nextM = idx < ALL_MONTHS_DATA.length - 1 ? ALL_MONTHS_DATA[idx + 1] : null;
   const prevNav = prevM ? `<a href="${rel(2, monthPath(prevM.y, prevM.m))}">← ${prevM.y}年${prevM.m}月</a>` : "<span></span>";
@@ -264,6 +300,7 @@ function buildMonthPage(idx) {
 <tbody>${tableRows}</tbody></table></div>
 <p class="note">備考の「天赦」は<a href="${rel(2, tenshaPath(y))}">天赦日</a>、「一粒万倍」は<a href="${rel(2, ichiryuPath(y))}">一粒万倍日</a>、「不成就」は<a href="${rel(2, fujojuPath(y))}">不成就日</a>を示します（複数該当する日もあります）。</p>
 ${meigetsuNote}
+${saikyobiNote}
 <div style="display:flex;justify-content:space-between;margin:1rem 0">${prevNav}${nextNav}</div>
 <section class="faq"><h2>よくある質問</h2><dl>
 <dt>${m}月の大安はいつ？</dt><dd>${y}年${m}月の大安は${taianDays.map(d => `${d}日`).join("・")}です。</dd>
@@ -530,6 +567,62 @@ ${guideLinks(1)}`;
   }));
 }
 
+// ---- 最強開運日（天赦日×一粒万倍日）ページ ----
+function buildSaikyobiGuide() {
+  const fmt = it => `${it.m}月${it.d}日(${WDAYS[it.wday]})`;
+  const monthPublished = (y, m) => MONTHS.some(mo => mo.y === y && mo.m === m);
+  const yearTable = y => {
+    const list = SAIKYOBI_BY_YEAR[y];
+    const rows = list.map(it => {
+      const remark = it.fujoju ? `<strong>⚠不成就日と重複</strong>` : "";
+      const dateCell = monthPublished(y, it.m) ? `<a href="${rel(1, monthPath(y, it.m))}">${fmt(it)}</a>` : fmt(it);
+      return `<tr><td>${dateCell}</td><td>${esc(it.rokuyo)}</td><td>${remark}</td></tr>`;
+    }).join("\n");
+    return `<h2>${y}年の最強開運日</h2><div class="tbl"><table><thead><tr><th>日付</th><th>六曜</th><th>備考</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  };
+
+  const list2026 = SAIKYOBI_BY_YEAR[2026], list2027 = SAIKYOBI_BY_YEAR[2027];
+  const introDates = `2026年は${list2026.map(fmt).join("・")}の${list2026.length}日、2027年は${list2027.map(fmt).join("・")}の${list2027.length}日`;
+
+  const body = `
+<section class="feature"><p>「最強開運日」と呼ばれる、暦の中でも最上の吉日とされる<a href="${rel(1, tenshaPath(2026))}">天赦日</a>と、始めたことが大きく育つとされる一粒万倍日が同じ日に重なるのは、${introDates}です。当サイトの独自計算エンジンで、2026年・2027年の全日を走査して算出しています。</p></section>
+${yearTable(2026)}
+${yearTable(2027)}
+<h2>天赦日とは</h2>
+<p>天赦日（てんしゃにち）は「天が万物の罪を赦す日」に由来するとされる、暦の中でも最上の吉日とされています。季節ごとに定められた干支の日にあたり、年に5〜6回ほどしか巡ってきません。詳しい仕組みは<a href="${rel(1, tenshaPath(2026))}">天赦日 2026年の一覧</a>・<a href="${rel(1, tenshaPath(2027))}">2027年の一覧</a>で解説しています。</p>
+<h2>一粒万倍日とは</h2>
+<p>一粒万倍日（いちりゅうまんばいび）は「一粒の籾が万倍の稲穂に実る」ことに由来するとされる吉日で、何かを始めるのに良い日とされています。節切りの月ごとに巡ってくるため、天赦日より頻度が高く、月に4〜7回ほどあります。やると良いこと・避けることの詳細は<a href="${rel(1, "guide/ichiryumanbai-imi/")}">一粒万倍日とは？やると良いこと・避けること</a>をご覧ください。</p>
+<p>この2つの吉日はそれぞれ別の体系で決まるため重なる日は限られており、両方の意味を併せ持つ日として「最強開運日」と呼ばれることがあります。</p>
+<h2>不成就日と重なる日はどうする？</h2>
+<p>2026年7月19日と2027年9月26日は、天赦日・一粒万倍日に加えて<a href="${rel(1, "fujojubi/")}">不成就日</a>（何事も成就しないとされる選日）にもあたります。不成就日と吉日が同じ日に重なった場合の考え方には諸説あり、「不成就日の性質が優先され、吉日の効果が打ち消されるとして避ける」という説と、「天赦日は暦の中でも最上位の吉日なので気にしなくてよい」という説の両方があるとされています。どちらが正しいという明確な決まりはないため、気になる方は日付をずらすなど、無理のない範囲で参考にするとよいでしょう。</p>
+<h2>最強開運日にやると良いとされること</h2>
+<ul>
+<li><strong>財布の新調・使い始め</strong> — 天赦日・一粒万倍日それぞれで人気の縁起担ぎが重なるため、財布の使い始めに選ぶ人が多いとされています。</li>
+<li><strong>開業・開店</strong> — 始めた事業が大きく育つことを願って、開業日に選ぶ人が多いとされています。</li>
+<li><strong>宝くじの購入</strong> — 当選金が万倍に増えることを願って、購入日に選ぶ人が多いとされています。</li>
+<li><strong>入籍</strong> — 二人の門出にふさわしい日として選ばれることが多いとされています。</li>
+</ul>
+<p class="note">六曜・天赦日・一粒万倍日はいずれも伝統的な暦注であり、科学的な根拠はありません。日取りの参考程度にご利用ください。</p>
+${affiliateBlock(SAIKYOBI_GOODS, "最強開運日に揃えたい開運グッズ")}
+<section class="faq"><h2>よくある質問</h2><dl>
+<dt>最強開運日とは？</dt><dd>暦の中でも最上の吉日とされる天赦日と、一粒万倍日が同じ日に重なる日のことです。年に数回しかない珍しい重なりです。</dd>
+<dt>不成就日と重なった日は避けるべき？</dt><dd>不成就日の効果が優先されるとして避ける説と、天赦日が最上位なので気にしなくてよいとする説の両方があり、明確な決まりはありません。</dd>
+<dt>次の最強開運日はいつ？</dt><dd>2026年は3月5日・7月19日・10月1日・12月16日、2027年は7月14日・9月26日・12月11日です。</dd>
+</dl></section>
+<h2>あわせてチェック</h2>
+${kichijitsuLinks(1)}
+${guideLinks(1)}`;
+
+  writePage(`${saikyobiPath}index.html`, shell({
+    path: saikyobiPath, depth: 1,
+    title: "最強開運日はいつ？【2026年・2027年】天赦日と一粒万倍日が重なる日",
+    desc: `最強開運日（天赦日×一粒万倍日）は2026年3月5日・7月19日・10月1日・12月16日、2027年7月14日・9月26日・12月11日。不成就日と重なる日の考え方、やると良いとされることをわかりやすく解説します。`,
+    h1: "最強開運日はいつ？天赦日と一粒万倍日が重なる日",
+    breadcrumbs: [{ name: "六曜カレンダー", path: "" }, { name: "最強開運日はいつ？", path: saikyobiPath }],
+    body,
+  }));
+}
+
 // ---- ガイドページ ----
 function buildGuide(slug, title, descText, h1, bodyHtml) {
   writePage(`guide/${slug}/index.html`, shell({
@@ -727,6 +820,7 @@ buildFujojuPage(2026);
 buildFujojuPage(2027);
 buildFujojuGuide();
 buildMeigetsuGuide();
+buildSaikyobiGuide();
 buildGuides();
 buildHome();
 build404();
@@ -738,7 +832,7 @@ for (const t of linkTargets) {
   const f = path.join(OUT, t, "index.html");
   if (!fs.existsSync(f)) throw new Error(`BROKEN LINK TARGET: ${t}`);
 }
-const expected = 1 + ALL_MONTHS_DATA.length + 2 + 4 + 3 + 1 + 4; // home + 月別17 + 大安一覧2 + 一粒万倍日/天赦日4 + 不成就日3(解説+年別2) + 中秋の名月1 + ガイド4
+const expected = 1 + ALL_MONTHS_DATA.length + 2 + 4 + 3 + 1 + 1 + 4; // home + 月別17 + 大安一覧2 + 一粒万倍日/天赦日4 + 不成就日3(解説+年別2) + 中秋の名月1 + 最強開運日1 + ガイド4
 if (emittedUrls.length !== expected) throw new Error(`page count ${emittedUrls.length} != ${expected}`);
 if (!emittedUrls.every(u => u.startsWith(BASE))) throw new Error("URL outside BASE");
 console.log(`OK: ${emittedUrls.length} pages + 404 + sitemap generated for ${TODAY_STR}`);
