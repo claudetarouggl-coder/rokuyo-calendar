@@ -7,7 +7,7 @@ const { makeConverter } = require("./lib/kyureki");
 const { isIchiryumanbai, isTenshabi } = require("./lib/kanshi");
 const { isFujoju } = require("./lib/fujoju");
 const { holidaysOf } = require("./lib/shukujitsu");
-const { GOODS, MOON_GOODS, SAIKYOBI_GOODS } = require("./lib/affiliates");
+const { GOODS, MOON_GOODS, SAIKYOBI_GOODS, NENGAJO_GOODS } = require("./lib/affiliates");
 
 const BASE = "https://claudetarouggl-coder.github.io/rokuyo-calendar/";
 const GA_ID = "G-P6NLJ3XZ7R";
@@ -37,6 +37,7 @@ const fujojuPath = y => `fujojubi/${y}/`;
 const meigetsuPath = "meigetsu/";
 const saikyobiPath = "saikyobi/";
 const shukujitsuPath = "shukujitsu/";
+const nengajoPath = "nengajo/";
 const daysInMonth = (y, m) => new Date(Date.UTC(y, m, 0)).getUTCDate();
 const wdayOf = (y, m, d) => new Date(Date.UTC(y, m - 1, d)).getUTCDay();
 const lunarStrOf = c => `旧暦${c.leap ? "閏" : ""}${c.month}月${c.day}日`;
@@ -250,7 +251,8 @@ const guideLinks = depth => `<h2>あわせて読む</h2><div class="links">
 <a href="${rel(depth, "fujojubi/")}">不成就日とは？由来と8日周期のルール</a>
 <a href="${rel(depth, meigetsuPath)}">中秋の名月はいつ？十五夜・十三夜の日付</a>
 <a href="${rel(depth, saikyobiPath)}">最強開運日はいつ？天赦日と一粒万倍日が重なる日</a>
-<a href="${rel(depth, shukujitsuPath)}">祝日カレンダー｜振替休日・連休一覧</a></div>`;
+<a href="${rel(depth, shukujitsuPath)}">祝日カレンダー｜振替休日・連休一覧</a>
+<a href="${rel(depth, nengajoPath)}">年賀状はいつまで？喪中はがき・寒中見舞いの時期</a></div>`;
 
 const taianLinks = depth => `<div class="links">
 <a href="${rel(depth, "taian/2026/")}">2026年の大安一覧</a>
@@ -668,7 +670,7 @@ ${yearTable(2027)}
 <p>2026年は9月19日(土)・20日(日)の週末に続けて、21日(月)<a href="${rel(1, monthPath(2026, 9))}">敬老の日</a>、22日(火)国民の休日、23日(水)秋分の日と祝日が3日連続します。間に平日を挟まないため、9月${swLabel}が5連休になります。この並びは「国民の休日」（後述）によって敬老の日と秋分の日の間の平日が休日になることで生まれています。祝日・休日は<a href="${rel(1, monthPath(2026, 9))}">2026年9月のカレンダー</a>で日別の六曜とあわせて確認できます。</p>
 <h2>ゴールデンウィーク2027は5月${gwLabel}</h2>
 <p>2027年のゴールデンウィークは、5月1日(土)・2日(日)の週末に憲法記念日（5月3日）・みどりの日（5月4日）・こどもの日（5月5日）が続き、5月${gwLabel}の5連休になります。憲法記念日が日曜日ではないため振替休日は発生しません。詳しくは<a href="${rel(1, monthPath(2027, 5))}">2027年5月のカレンダー</a>をご覧ください。</p>
-<p>年末年始は、2026年12月31日(木)を挟んで2027年1月1日(金)が元日、2日(土)・3日(日)と続くため、大型連休というよりは3連休程度の並びになります。</p>
+<p>年末年始は、2026年12月31日(木)を挟んで2027年1月1日(金)が元日、2日(土)・3日(日)と続くため、大型連休というよりは3連休程度の並びになります。年末年始の予定を立てる際は、<a href="${rel(1, nengajoPath)}">年賀状はいつまでに出す？喪中はがき・寒中見舞いの時期</a>もあわせてご確認ください。</p>
 <h2>振替休日とは</h2>
 <p>振替休日は、祝日が日曜日にあたった場合に、その直後で最初に祝日ではない日を休日とする制度です（祝日法第3条第2項）。2026年は5月3日の憲法記念日が日曜日にあたるため、5月4日・5日は他の祝日（みどりの日・こどもの日）ですでに埋まっており、その次の5月6日が振替休日になります。2027年は3月21日の春分の日が日曜日にあたるため、翌3月22日が振替休日です。</p>
 <h2>国民の休日とは</h2>
@@ -688,6 +690,57 @@ ${guideLinks(1)}`;
     desc: `2026年・2027年の祝日・休日を六曜つきで一覧掲載。9月${swLabel}のシルバーウィーク2026、5月${gwLabel}のゴールデンウィーク2027、振替休日・国民の休日の仕組みをわかりやすく解説します。`,
     h1: "祝日カレンダー｜振替休日・連休一覧",
     breadcrumbs: [{ name: "六曜カレンダー", path: "" }, { name: "祝日カレンダー", path: shukujitsuPath }],
+    body,
+  }));
+}
+
+// ---- 年賀状・喪中はがき・寒中見舞いページ ----
+function buildNengajoGuide() {
+  const fmt = (y, m, d) => {
+    const wday = wdayOf(y, m, d);
+    return `${y}年${m}月${d}日(${WDAYS[wday]})`;
+  };
+  const rokuyoOf = (y, m, d) => conv(y, m, d).rokuyo;
+  const row = (label, y, m, d, note) =>
+    `<tr><td>${esc(label)}</td><td>${fmt(y, m, d)}</td><td>${esc(rokuyoOf(y, m, d))}</td><td>${esc(note)}</td></tr>`;
+
+  const scheduleTable = `<div class="tbl"><table><thead><tr><th>項目</th><th>日付の目安</th><th>六曜</th><th>備考</th></tr></thead><tbody>
+${row("年賀状の引受開始", 2026, 12, 15, "例年ベースの目安")}
+${row("元日配達の投函目安", 2026, 12, 25, "この日までの投函が目安")}
+${row("松の内（関東など）", 2027, 1, 7, "これ以降は寒中見舞いに")}
+${row("松の内（関西など）", 2027, 1, 15, "地域により異なるとされる")}
+${row("寒中見舞いの開始目安", 2027, 1, 8, "松の内が明けてから")}
+${row("立春（寒中見舞いの終わり目安）", 2027, 2, 4, "これ以降は余寒見舞いに")}
+</tbody></table></div>`;
+
+  const body = `
+<section class="feature"><p>年賀状は例年12月15日ごろに引き受けが始まり、元日に届けるには<strong>12月25日ごろまで</strong>の投函が目安とされています。喪中はがきは、相手が年賀状を準備し始める前の<strong>11月中〜12月上旬ごろまで</strong>に届くよう出すのが目安とされ、松の内（1月7日、地域により1月15日ごろ）を過ぎてからの年始のあいさつは、寒中見舞いに切り替えるのが一般的とされています。2026年12月〜2027年2月の実際の日付・曜日・六曜を表にまとめました。</p></section>
+<h2>年賀状・寒中見舞いのスケジュール【2026年-2027年】</h2>
+${scheduleTable}
+<p class="note">日本郵便の2026年12月分の年賀状引受開始日は、本ページ執筆時点でまだ公式発表されていません。上表は例年のスケジュール（<a href="https://www.post.japanpost.jp/question/140.html" target="_blank" rel="noopener">日本郵便公式サイト</a>の直近年の実績）をもとにした目安です。正式な日付は日本郵便の発表でご確認ください。</p>
+<h2>年賀状はいつまでに出す？</h2>
+<p>年賀状の引受は例年12月15日ごろに始まり、元日（1月1日）に届けるための投函は<strong>12月25日ごろまで</strong>が目安とされています。これを過ぎても松の内（1月7日ごろ、関西では1月15日ごろとされる）までに届くのであれば年賀状として問題ないとされ、それ以降は「寒中見舞い」に切り替えるのがマナーとされています。</p>
+<h2>喪中はがきはいつまでに出す？</h2>
+<p>喪中はがき（年賀欠礼状）は、相手が年賀状を準備し始める前に届くよう、<strong>11月中〜12月上旬ごろまで</strong>に出すのが目安とされています。年賀状の受付が例年12月15日ごろから始まることをふまえると、遅くとも12月上旬までには相手に届くようにしたいところです。あまり早く出しすぎると相手が忘れてしまうこともあるとされるため、11月中旬以降が目安になるとされています。</p>
+<p>喪中の範囲について明確な決まりはありませんが、一般的には二親等（親・子・兄弟姉妹・祖父母・孫）までを目安とする考え方が多いとされています。同居の有無や故人との関係の深さによって喪中はがきを出すかどうかを判断する方も多く、厳密なルールがあるわけではありません。</p>
+<h2>寒中見舞いはいつからいつまで？</h2>
+<p>寒中見舞いは、松の内が明けた1月8日ごろから、立春（2月4日ごろ）までに届くよう送るのが目安とされています。年賀状を出しそびれた場合の返礼や、喪中はがきをもらった相手への年始のあいさつとして使われることが多く、立春を過ぎると「余寒見舞い」に呼び方が変わるとされています。</p>
+<section class="faq"><h2>よくある質問</h2><dl>
+<dt>年賀状は12月25日を過ぎても出していい？</dt><dd>元日配達の目安は過ぎますが、松の内（1月7日ごろ）までに届くのであれば年賀状として問題ないとされています。それ以降は寒中見舞いに切り替えるのが一般的です。</dd>
+<dt>喪中はがきを出しそびれた場合は？</dt><dd>12月に入ってから不幸があった場合など、喪中はがきが間に合わないときは、松の内明けから立春までの間に寒中見舞いとしてあいさつを送る方法があるとされています。</dd>
+<dt>喪中はがきをもらったら年賀状は出さない？</dt><dd>喪中はがきは「こちらから年賀状を出せません」という知らせであり、相手に年賀状を送ってはいけないという意味ではないとされています。気になる場合は寒中見舞いで返すという考え方もあります。</dd>
+</dl></section>
+${affiliateBlock(NENGAJO_GOODS, "年賀状・喪中はがきの準備に")}
+<h2>あわせてチェック</h2>
+<div class="links"><a href="${rel(1, shukujitsuPath)}">祝日カレンダー｜振替休日・連休一覧</a></div>
+${guideLinks(1)}`;
+
+  writePage(`${nengajoPath}index.html`, shell({
+    path: nengajoPath, depth: 1,
+    title: "年賀状はいつまでに出す？喪中はがき・寒中見舞いの時期【2026-2027】",
+    desc: "年賀状は例年12月15日ごろ受付開始、元日配達は12月25日ごろまでが目安。喪中はがきは11月中〜12月上旬まで、寒中見舞いは松の内明け(1月8日ごろ)〜立春(2月4日ごろ)が目安です。2026年末〜2027年始の日付・曜日・六曜つきで解説します。",
+    h1: "年賀状はいつまでに出す？喪中はがき・寒中見舞いの時期",
+    breadcrumbs: [{ name: "六曜カレンダー", path: "" }, { name: "年賀状はいつまで？", path: nengajoPath }],
     body,
   }));
 }
@@ -891,6 +944,7 @@ buildFujojuGuide();
 buildMeigetsuGuide();
 buildSaikyobiGuide();
 buildShukujitsuGuide();
+buildNengajoGuide();
 buildGuides();
 buildHome();
 build404();
@@ -902,7 +956,7 @@ for (const t of linkTargets) {
   const f = path.join(OUT, t, "index.html");
   if (!fs.existsSync(f)) throw new Error(`BROKEN LINK TARGET: ${t}`);
 }
-const expected = 1 + ALL_MONTHS_DATA.length + 2 + 4 + 3 + 1 + 1 + 1 + 4; // home + 月別17 + 大安一覧2 + 一粒万倍日/天赦日4 + 不成就日3(解説+年別2) + 中秋の名月1 + 最強開運日1 + 祝日カレンダー1 + ガイド4
+const expected = 1 + ALL_MONTHS_DATA.length + 2 + 4 + 3 + 1 + 1 + 1 + 1 + 4; // home + 月別17 + 大安一覧2 + 一粒万倍日/天赦日4 + 不成就日3(解説+年別2) + 中秋の名月1 + 最強開運日1 + 祝日カレンダー1 + 年賀状ガイド1 + ガイド4
 if (emittedUrls.length !== expected) throw new Error(`page count ${emittedUrls.length} != ${expected}`);
 if (!emittedUrls.every(u => u.startsWith(BASE))) throw new Error("URL outside BASE");
 console.log(`OK: ${emittedUrls.length} pages + 404 + sitemap generated for ${TODAY_STR}`);
