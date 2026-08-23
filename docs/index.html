@@ -48,7 +48,7 @@ footer{margin:2rem 0 1rem;color:#8a7a6c;font-size:.75rem;text-align:center;line-
 
 <h1>六曜カレンダー</h1>
 
-<section class="today" id="today-card"><div class="lb">今日（2026年8月16日）の六曜</div><div class="vl" id="today-rokuyo">仏滅</div><div class="lb">旧暦7月4日・詳しくは<a href="2026/08/">2026年8月のカレンダー</a></div></section>
+<section class="today" id="today-card"><div class="lb">今日（2026年8月24日）の六曜</div><div class="vl" id="today-rokuyo">赤口</div><div class="lb">旧暦7月12日・詳しくは<a href="2026/08/">2026年8月のカレンダー</a></div></section>
 <section class="feature"><p>六曜（大安・友引・先勝・先負・仏滅・赤口）と旧暦を、2026年8月〜2027年12月の期間で日別に確認できるカレンダーサイトです。結婚式・入籍・納車・引っ越しなど、日取りを選ぶ際の参考にご利用ください。</p></section>
 <h2>月別カレンダー</h2>
 <h3>2026年</h3><div class="links"><a href="2026/08/">8月</a><a href="2026/09/">9月</a><a href="2026/10/">10月</a><a href="2026/11/">11月</a><a href="2026/12/">12月</a></div>
@@ -68,7 +68,8 @@ footer{margin:2rem 0 1rem;color:#8a7a6c;font-size:.75rem;text-align:center;line-
 <a href="guide/kekkonshiki/">仏滅・友引の結婚式はダメ？</a>
 <a href="guide/tomobiki/">友引に葬式を避けるのはなぜ？</a>
 <a href="guide/ichiryumanbai-imi/">一粒万倍日とは？やると良いこと・避けること</a>
-<a href="fujojubi/">不成就日とは？由来と8日周期のルール</a></div>
+<a href="fujojubi/">不成就日とは？由来と8日周期のルール</a>
+<a href="meigetsu/">中秋の名月はいつ？十五夜・十三夜の日付</a></div>
 <section class="faq"><h2>よくある質問</h2><dl>
 <dt>今日の六曜がすぐ知りたい</dt><dd>このページ上部の「今日の六曜」カードでご確認いただけます。</dd>
 <dt>大安の日取りを探したい</dt><dd><a href="taian/2026/">2026年の大安一覧</a>・<a href="taian/2027/">2027年の大安一覧</a>から月別に確認できます。</dd>
@@ -87,7 +88,7 @@ var MONTH_URL="https://claudetarouggl-coder.github.io/rokuyo-calendar/";
   var now=new Date(Date.now()+540*60000);
   var y=now.getUTCFullYear(),m=now.getUTCMonth()+1,d=now.getUTCDate();
   var key=y+"-"+m+"-"+d;
-  if(key==="2026-8-16")return; // ビルド当日はサーバー描画（旧暦つき）のまま
+  if(key==="2026-8-24")return; // ビルド当日はサーバー描画（旧暦つき）のまま
   var card=document.getElementById("today-card");
   if(!card)return;
   if(Object.prototype.hasOwnProperty.call(ROKUYO_MAP,key)){

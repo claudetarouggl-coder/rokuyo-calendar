@@ -6,7 +6,7 @@ const path = require("path");
 const { makeConverter } = require("./lib/kyureki");
 const { isIchiryumanbai, isTenshabi } = require("./lib/kanshi");
 const { isFujoju } = require("./lib/fujoju");
-const { GOODS } = require("./lib/affiliates");
+const { GOODS, MOON_GOODS } = require("./lib/affiliates");
 
 const BASE = "https://claudetarouggl-coder.github.io/rokuyo-calendar/";
 const GA_ID = "G-P6NLJ3XZ7R";
@@ -33,9 +33,30 @@ const monthPath = (y, m) => `${y}/${pad2(m)}/`;
 const ichiryuPath = y => `ichiryumanbai/${y}/`;
 const tenshaPath = y => `tensha/${y}/`;
 const fujojuPath = y => `fujojubi/${y}/`;
+const meigetsuPath = "meigetsu/";
 const daysInMonth = (y, m) => new Date(Date.UTC(y, m, 0)).getUTCDate();
 const wdayOf = (y, m, d) => new Date(Date.UTC(y, m - 1, d)).getUTCDay();
 const lunarStrOf = c => `旧暦${c.leap ? "閏" : ""}${c.month}月${c.day}日`;
+
+// ---- 中秋の名月（旧暦8/15）・十三夜（旧暦9/13）----
+// 出典: 国立天文台 2026年9月の天文現象 https://www.nao.ac.jp/astro/sky/2026/09-topics03.html
+// （2026年の朔=9/11 12:27 JST、満月=9/27。名月は朔日起算の旧暦8/15で決まるため2日ずれる）
+const MEIGETSU = {
+  2026: { y: 2026, m: 9, d: 25 },
+  2027: { y: 2027, m: 9, d: 15 },
+};
+const JUSANYA = {
+  2026: { y: 2026, m: 10, d: 23 },
+  2027: { y: 2027, m: 10, d: 12 },
+};
+for (const y of [2026, 2027]) {
+  const mg = MEIGETSU[y], c1 = conv(mg.y, mg.m, mg.d);
+  if (!(c1.month === 8 && c1.day === 15 && !c1.leap)) throw new Error(`meigetsu anchor mismatch for ${y}: ${JSON.stringify(c1)}`);
+  mg.rokuyo = c1.rokuyo; mg.wday = wdayOf(mg.y, mg.m, mg.d);
+  const jy = JUSANYA[y], c2 = conv(jy.y, jy.m, jy.d);
+  if (!(c2.month === 9 && c2.day === 13 && !c2.leap)) throw new Error(`jusanya anchor mismatch for ${y}: ${JSON.stringify(c2)}`);
+  jy.rokuyo = c2.rokuyo; jy.wday = wdayOf(jy.y, jy.m, jy.d);
+}
 
 function monthRows(y, m) {
   const last = daysInMonth(y, m);
@@ -186,7 +207,8 @@ const guideLinks = depth => `<h2>あわせて読む</h2><div class="links">
 <a href="${rel(depth, "guide/kekkonshiki/")}">仏滅・友引の結婚式はダメ？</a>
 <a href="${rel(depth, "guide/tomobiki/")}">友引に葬式を避けるのはなぜ？</a>
 <a href="${rel(depth, "guide/ichiryumanbai-imi/")}">一粒万倍日とは？やると良いこと・避けること</a>
-<a href="${rel(depth, "fujojubi/")}">不成就日とは？由来と8日周期のルール</a></div>`;
+<a href="${rel(depth, "fujojubi/")}">不成就日とは？由来と8日周期のルール</a>
+<a href="${rel(depth, meigetsuPath)}">中秋の名月はいつ？十五夜・十三夜の日付</a></div>`;
 
 const taianLinks = depth => `<div class="links">
 <a href="${rel(depth, "taian/2026/")}">2026年の大安一覧</a>
@@ -225,6 +247,11 @@ function buildMonthPage(idx) {
     return `<tr class="${cls}"><td>${r.d}日(${WDAYS[r.wday]})</td><td>${esc(r.rokuyo)}</td><td>${esc(r.lunarStr)}</td><td>${esc(remarkOf(r))}</td></tr>`;
   }).join("\n");
 
+  const isMeigetsuMonth = (y === 2026 || y === 2027) && (m === 9 || m === 10);
+  const meigetsuNote = isMeigetsuMonth
+    ? `<p class="note"><a href="${rel(2, meigetsuPath)}">${y}年の中秋の名月・十三夜はいつ？</a>もあわせてご覧ください。</p>`
+    : "";
+
   const prevM = idx > 0 ? ALL_MONTHS_DATA[idx - 1] : null;
   const nextM = idx < ALL_MONTHS_DATA.length - 1 ? ALL_MONTHS_DATA[idx + 1] : null;
   const prevNav = prevM ? `<a href="${rel(2, monthPath(prevM.y, prevM.m))}">← ${prevM.y}年${prevM.m}月</a>` : "<span></span>";
@@ -236,6 +263,7 @@ function buildMonthPage(idx) {
 <thead><tr><th>日付(曜日)</th><th>六曜</th><th>旧暦</th><th>備考</th></tr></thead>
 <tbody>${tableRows}</tbody></table></div>
 <p class="note">備考の「天赦」は<a href="${rel(2, tenshaPath(y))}">天赦日</a>、「一粒万倍」は<a href="${rel(2, ichiryuPath(y))}">一粒万倍日</a>、「不成就」は<a href="${rel(2, fujojuPath(y))}">不成就日</a>を示します（複数該当する日もあります）。</p>
+${meigetsuNote}
 <div style="display:flex;justify-content:space-between;margin:1rem 0">${prevNav}${nextNav}</div>
 <section class="faq"><h2>よくある質問</h2><dl>
 <dt>${m}月の大安はいつ？</dt><dd>${y}年${m}月の大安は${taianDays.map(d => `${d}日`).join("・")}です。</dd>
@@ -456,6 +484,52 @@ ${guideLinks(1)}`;
   }));
 }
 
+// ---- 中秋の名月・お月見ページ ----
+function buildMeigetsuGuide() {
+  const fmt = it => `${it.m}月${it.d}日(${WDAYS[it.wday]})`;
+  const yearSection = y => {
+    const mg = MEIGETSU[y], jy = JUSANYA[y];
+    return `
+<h2>${y}年の中秋の名月・十三夜</h2>
+<div class="tbl"><table><thead><tr><th></th><th>日付</th><th>旧暦</th><th>六曜</th></tr></thead><tbody>
+<tr><td>中秋の名月（十五夜）</td><td>${fmt(mg)}</td><td>旧暦8月15日</td><td>${esc(mg.rokuyo)}</td></tr>
+<tr><td>十三夜（後の月）</td><td>${fmt(jy)}</td><td>旧暦9月13日</td><td>${esc(jy.rokuyo)}</td></tr>
+</tbody></table></div>
+<p>日別の六曜は<a href="${rel(1, monthPath(y, 9))}">${y}年9月のカレンダー</a>・<a href="${rel(1, monthPath(y, 10))}">${y}年10月のカレンダー</a>でご確認いただけます。</p>`;
+  };
+
+  const body = `
+<section class="feature"><p>2026年の中秋の名月（十五夜）は<strong>${fmt(MEIGETSU[2026])}</strong>、十三夜は<strong>${fmt(JUSANYA[2026])}</strong>です。2027年は中秋の名月が${fmt(MEIGETSU[2027])}、十三夜が${fmt(JUSANYA[2027])}です。いずれも旧暦（太陰太陽暦）の8月15日・9月13日にあたる日で、当サイトの独自計算エンジンで算出しています。</p></section>
+${yearSection(2026)}
+${yearSection(2027)}
+<h2>中秋の名月とは？「仲秋」との違い</h2>
+<p>中秋の名月は、旧暦8月15日の夜に見える月を指し、「十五夜」とも呼ばれます。旧暦では7〜9月を秋とし、その真ん中にあたる8月を「仲秋」と呼ぶことから「仲秋の名月」と書かれることもありますが、8月15日という特定の1日を指す場合は「中秋の名月」、8月全体を指す場合は「仲秋」と使い分けるのが本来の表記とされています。</p>
+<h2>2026年は「名月」と「満月」が2日ずれる</h2>
+<p>2026年は、中秋の名月（9月25日）と実際の満月（9月27日）の日付が2日ずれます。中秋の名月は、朔（新月）の瞬間を含む日を旧暦8月の1日として数え、その15日目にあたる日として機械的に決まるのに対し、満月は月・地球・太陽の位置関係から独立に決まるためです。2026年9月の朔は9月11日12時27分ごろで、そこから数えた旧暦8月15日は9月25日になりますが、実際に月が最も丸く見える瞬間は9月27日ごろに訪れます。名月と満月が同じ日にならないのは珍しいことではなく、年によって1〜2日前後します。詳しくは<a href="https://www.nao.ac.jp/astro/sky/2026/09-topics03.html" target="_blank" rel="noopener">国立天文台の解説</a>をご覧ください。</p>
+<h2>十三夜と「片見月」</h2>
+<p>十三夜は「後の月」とも呼ばれ、中秋の名月から約1か月後の旧暦9月13日に行うお月見で、日本独自の風習とされています。中秋の名月と十三夜のどちらか一方しか月見をしないことを「片見月」と呼び、縁起が良くないとされています。必ず両方行わなければならない決まりではありませんが、気になる方は2つの日をあわせてカレンダーに入れておくとよいでしょう。</p>
+<h2>お月見に用意するもの</h2>
+<p>月見団子は満月に見立てた丸い団子で、十五夜には15個（または5個）を三方（さんぽう、お供え用の台）にピラミッド状に積んで供えるのが一般的とされています。すすきは稲穂に見立てた魔除けの意味があるとされ、5本前後を束ねて花瓶などに飾ります。里芋や栗、季節の果物をあわせて供える地域もあり、決まった作法があるわけではないため、無理のない範囲で用意すれば十分とされています。</p>
+${affiliateBlock(MOON_GOODS, "お月見に揃えたい月見団子・すすき・お供え台")}
+<section class="faq"><h2>よくある質問</h2><dl>
+<dt>中秋の名月は満月と同じ日ですか？</dt><dd>同じ日になる年もありますが、旧暦の数え方と天文学的な満月の瞬間は別々に決まるため、2026年のように1〜2日ずれる年もあります。</dd>
+<dt>十三夜だけ行ってもいい？</dt><dd>片見月は縁起が良くないとされていますが、必ず両方行わなければならない決まりではありません。都合に合わせて無理のない範囲で楽しむとよいとされています。</dd>
+<dt>中秋の名月と十三夜、どちらが重要？</dt><dd>どちらも大切なお月見の行事とされていますが、中秋の名月（十五夜）の方がより広く親しまれています。</dd>
+</dl></section>
+<h2>あわせてチェック</h2>
+${kichijitsuLinks(1)}
+${guideLinks(1)}`;
+
+  writePage(`${meigetsuPath}index.html`, shell({
+    path: meigetsuPath, depth: 1,
+    title: "中秋の名月はいつ？【2026年・2027年】十五夜・十三夜の日付と月見カレンダー",
+    desc: `中秋の名月は2026年9月25日(金)、十三夜は10月23日(金)。2027年は9月15日・10月12日。旧暦から計算した日付と六曜、名月と満月が2日ずれる理由、お月見の準備をわかりやすく解説します。`,
+    h1: "中秋の名月はいつ？十五夜・十三夜の日付と月見カレンダー",
+    breadcrumbs: [{ name: "六曜カレンダー", path: "" }, { name: "中秋の名月はいつ？", path: meigetsuPath }],
+    body,
+  }));
+}
+
 // ---- ガイドページ ----
 function buildGuide(slug, title, descText, h1, bodyHtml) {
   writePage(`guide/${slug}/index.html`, shell({
@@ -652,6 +726,7 @@ buildTenshaPage(2027);
 buildFujojuPage(2026);
 buildFujojuPage(2027);
 buildFujojuGuide();
+buildMeigetsuGuide();
 buildGuides();
 buildHome();
 build404();
@@ -663,7 +738,7 @@ for (const t of linkTargets) {
   const f = path.join(OUT, t, "index.html");
   if (!fs.existsSync(f)) throw new Error(`BROKEN LINK TARGET: ${t}`);
 }
-const expected = 1 + ALL_MONTHS_DATA.length + 2 + 4 + 3 + 4; // home + 月別17 + 大安一覧2 + 一粒万倍日/天赦日4 + 不成就日3(解説+年別2) + ガイド4
+const expected = 1 + ALL_MONTHS_DATA.length + 2 + 4 + 3 + 1 + 4; // home + 月別17 + 大安一覧2 + 一粒万倍日/天赦日4 + 不成就日3(解説+年別2) + 中秋の名月1 + ガイド4
 if (emittedUrls.length !== expected) throw new Error(`page count ${emittedUrls.length} != ${expected}`);
 if (!emittedUrls.every(u => u.startsWith(BASE))) throw new Error("URL outside BASE");
 console.log(`OK: ${emittedUrls.length} pages + 404 + sitemap generated for ${TODAY_STR}`);
