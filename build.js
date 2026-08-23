@@ -167,6 +167,18 @@ for (const { y, m, rows } of ALL_MONTHS_DATA) {
   for (const r of rows) if (r.rokuyo === "大安") TAIAN_BY_YEAR[y].push({ y, m, d: r.d, wday: r.wday });
 }
 
+// 仏滅・友引一覧（年別）
+const BUTSUMETSU_BY_YEAR = {};
+const TOMOBIKI_BY_YEAR = {};
+for (const { y, m, rows } of ALL_MONTHS_DATA) {
+  BUTSUMETSU_BY_YEAR[y] = BUTSUMETSU_BY_YEAR[y] || [];
+  TOMOBIKI_BY_YEAR[y] = TOMOBIKI_BY_YEAR[y] || [];
+  for (const r of rows) {
+    if (r.rokuyo === "仏滅") BUTSUMETSU_BY_YEAR[y].push({ y, m, d: r.d, wday: r.wday });
+    if (r.rokuyo === "友引") TOMOBIKI_BY_YEAR[y].push({ y, m, d: r.d, wday: r.wday });
+  }
+}
+
 const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const emittedUrls = [];
 const linkTargets = new Set();
@@ -276,6 +288,10 @@ const taianLinks = depth => `<div class="links">
 const kichijitsuLinks = depth => `<div class="links">
 <a href="${rel(depth, "taian/2026/")}">2026年の大安一覧</a>
 <a href="${rel(depth, "taian/2027/")}">2027年の大安一覧</a>
+<a href="${rel(depth, "butsumetsu/2026/")}">2026年の仏滅一覧</a>
+<a href="${rel(depth, "butsumetsu/2027/")}">2027年の仏滅一覧</a>
+<a href="${rel(depth, "tomobiki/2026/")}">2026年の友引一覧</a>
+<a href="${rel(depth, "tomobiki/2027/")}">2027年の友引一覧</a>
 <a href="${rel(depth, ichiryuPath(2026))}">2026年の一粒万倍日一覧</a>
 <a href="${rel(depth, ichiryuPath(2027))}">2027年の一粒万倍日一覧</a>
 <a href="${rel(depth, tenshaPath(2026))}">2026年の天赦日一覧</a>
@@ -384,6 +400,61 @@ ${guideLinks(2)}`;
     desc: `${rangeNote}結婚式・入籍・納車・引っ越しの日取りに人気の大安の日付を月別に一覧掲載。土日の大安もひと目でわかります。`,
     h1: `${y}年の大安一覧`,
     breadcrumbs: [{ name: "六曜カレンダー", path: "" }, { name: `${y}年の大安一覧`, path: `taian/${y}/` }],
+    body,
+  }));
+}
+
+// ---- 仏滅・友引一覧ページ ----
+function monthListSections(list) {
+  const byMonth = {};
+  for (const it of list) (byMonth[it.m] = byMonth[it.m] || []).push(it);
+  return Object.keys(byMonth).map(m => {
+    const items = byMonth[m].map(it => {
+      const label = `${it.d}日（${WDAYS[it.wday]}）`;
+      return it.wday === 0 || it.wday === 6 ? `<li><strong>${label}</strong></li>` : `<li>${label}</li>`;
+    }).join("\n");
+    return `<h3>${m}月</h3><ul>${items}</ul>`;
+  }).join("\n");
+}
+
+function buildButsumetsuPage(y) {
+  const rangeNote = y === 2026 ? `2026年8月〜12月の仏滅一覧です。` : `2027年の仏滅一覧です。`;
+  const body = `
+<section class="feature"><p>${rangeNote}仏滅は六曜で「万事に凶」とされ、結婚式・入籍などの日取りでは避けられることが多い日です。一方で、もとは「物滅」と書き「物事がいったん終わり、新しく始まる日」とする解釈もあります。土日は太字で示しています。</p></section>
+<div class="tlist">${monthListSections(BUTSUMETSU_BY_YEAR[y])}</div>
+<section class="faq"><h2>よくある質問</h2><dl>
+<dt>仏滅に入籍・結婚式をしてはいけない？</dt><dd>六曜は伝統的な暦注で科学的根拠はなく、仏教とも直接の関係はないとされています。気にするかどうかは考え方次第です。詳しくは<a href="${rel(2, "guide/kekkonshiki/")}">仏滅・友引の結婚式はダメ？</a>をご覧ください。</dd>
+<dt>仏滅の引っ越し・納車は避けるべき？</dt><dd>根拠のある吉凶ではありませんが、周囲の意向が気になる場合は<a href="${rel(2, `taian/${y}/`)}">大安</a>など別の日を選ぶ方法もあります。逆に、式場や引っ越しの料金プランが仏滅は割安になる場合があり、あえて選ぶ方もいます。</dd>
+<dt>仏滅は月に何回ある？</dt><dd>六曜は旧暦の月と日の和を6で割った余りで機械的に決まるため月により変わりますが、おおむね5回前後です。</dd>
+</dl></section>
+${guideLinks(2)}`;
+  writePage(`butsumetsu/${y}/index.html`, shell({
+    path: `butsumetsu/${y}/`, depth: 2,
+    title: `${y}年の仏滅一覧｜結婚式・入籍・引っ越しで避けたい日をチェック`,
+    desc: `${rangeNote}結婚式・入籍・引っ越しの日取り選びで確認したい仏滅の日付を月別に一覧掲載。土日の仏滅もひと目でわかります。`,
+    h1: `${y}年の仏滅一覧`,
+    breadcrumbs: [{ name: "六曜カレンダー", path: "" }, { name: `${y}年の仏滅一覧`, path: `butsumetsu/${y}/` }],
+    body,
+  }));
+}
+
+function buildTomobikiPage(y) {
+  const rangeNote = y === 2026 ? `2026年8月〜12月の友引一覧です。` : `2027年の友引一覧です。`;
+  const body = `
+<section class="feature"><p>${rangeNote}友引は「友を引く」という語呂から葬儀を避ける習わしがある日で、友引を休業日とする火葬場も多くあります。一方、結婚式などの慶事では「幸せのお裾分け」として吉日とされます。土日は太字で示しています。</p></section>
+<div class="tlist">${monthListSections(TOMOBIKI_BY_YEAR[y])}</div>
+<section class="faq"><h2>よくある質問</h2><dl>
+<dt>友引に葬式をしてはいけない？</dt><dd>宗教上の禁忌ではなく語呂にもとづく俗信とされていますが、参列者への配慮や火葬場の休業により、実務上は友引を避けて日程を組むことが多いです。詳しくは<a href="${rel(2, "guide/tomobiki/")}">友引に葬式を避けるのはなぜ？</a>をご覧ください。</dd>
+<dt>友引に通夜はできる？</dt><dd>通夜は友引でも行われることが多いとされています。地域や斎場の慣習にもよるため、葬儀社にご確認ください。</dd>
+<dt>友引の結婚式・入籍は？</dt><dd>慶事では「幸せを友に引き分ける」とされ、大安に次ぐ吉日として人気があります。ただし午の刻（昼前後）は凶とする説もあります。</dd>
+</dl></section>
+${guideLinks(2)}`;
+  writePage(`tomobiki/${y}/index.html`, shell({
+    path: `tomobiki/${y}/`, depth: 2,
+    title: `${y}年の友引一覧｜葬儀・葬式の日取り確認に`,
+    desc: `${rangeNote}葬儀の日程調整や結婚式の日取り選びで確認したい友引の日付を月別に一覧掲載。土日の友引もひと目でわかります。`,
+    h1: `${y}年の友引一覧`,
+    breadcrumbs: [{ name: "六曜カレンダー", path: "" }, { name: `${y}年の友引一覧`, path: `tomobiki/${y}/` }],
     body,
   }));
 }
@@ -882,7 +953,7 @@ function buildHome() {
 <section class="feature"><p>六曜（大安・友引・先勝・先負・仏滅・赤口）と旧暦を、2026年8月〜2027年12月の期間で日別に確認できるカレンダーサイトです。結婚式・入籍・納車・引っ越しなど、日取りを選ぶ際の参考にご利用ください。</p></section>
 <h2>月別カレンダー</h2>
 ${yearGroups}
-<h2>大安・一粒万倍日・天赦日・不成就日を年間でチェック</h2>
+<h2>大安・仏滅・友引・一粒万倍日・天赦日・不成就日を年間でチェック</h2>
 ${kichijitsuLinks(0)}
 ${guideLinks(0)}
 <section class="faq"><h2>よくある質問</h2><dl>
@@ -949,6 +1020,10 @@ fs.rmSync(OUT, { recursive: true, force: true });
 ALL_MONTHS_DATA.forEach((_, i) => buildMonthPage(i));
 buildTaianPage(2026);
 buildTaianPage(2027);
+buildButsumetsuPage(2026);
+buildButsumetsuPage(2027);
+buildTomobikiPage(2026);
+buildTomobikiPage(2027);
 buildIchiryuPage(2026);
 buildIchiryuPage(2027);
 buildTenshaPage(2026);
@@ -971,7 +1046,7 @@ for (const t of linkTargets) {
   const f = path.join(OUT, t, "index.html");
   if (!fs.existsSync(f)) throw new Error(`BROKEN LINK TARGET: ${t}`);
 }
-const expected = 1 + ALL_MONTHS_DATA.length + 2 + 4 + 3 + 1 + 1 + 1 + 1 + 4; // home + 月別17 + 大安一覧2 + 一粒万倍日/天赦日4 + 不成就日3(解説+年別2) + 中秋の名月1 + 最強開運日1 + 祝日カレンダー1 + 年賀状ガイド1 + ガイド4
+const expected = 1 + ALL_MONTHS_DATA.length + 2 + 4 + 4 + 3 + 1 + 1 + 1 + 1 + 4; // home + 月別17 + 大安一覧2 + 仏滅/友引一覧4 + 一粒万倍日/天赦日4 + 不成就日3(解説+年別2) + 中秋の名月1 + 最強開運日1 + 祝日カレンダー1 + 年賀状ガイド1 + ガイド4
 if (emittedUrls.length !== expected) throw new Error(`page count ${emittedUrls.length} != ${expected}`);
 if (!emittedUrls.every(u => u.startsWith(BASE))) throw new Error("URL outside BASE");
 console.log(`OK: ${emittedUrls.length} pages + 404 + sitemap generated for ${TODAY_STR}`);
