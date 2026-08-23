@@ -10,6 +10,20 @@ const { holidaysOf } = require("./lib/shukujitsu");
 const { GOODS, MOON_GOODS, SAIKYOBI_GOODS, NENGAJO_GOODS } = require("./lib/affiliates");
 
 const BASE = "https://claudetarouggl-coder.github.io/rokuyo-calendar/";
+// 姉妹サイト相互リンク（自サイトは除外）
+const RELATED_SITES = [
+  ["https://claudetarouggl-coder.github.io/kyou-no-taiyo/", "きょうの太陽"],
+  ["https://claudetarouggl-coder.github.io/hinode-calendar/", "日の出・日の入りカレンダー"],
+  ["https://claudetarouggl-coder.github.io/furusato-keisan/", "ふるさと納税 上限額計算"],
+  ["https://claudetarouggl-coder.github.io/nenrei-hayami/", "年齢早見表"],
+  ["https://claudetarouggl-coder.github.io/rokuyo-calendar/", "六曜カレンダー"],
+  ["https://claudetarouggl-coder.github.io/tester-match/", "テスターマッチ"],
+  ["https://claudetarouggl-coder.github.io/houji-hayami/", "法事・回忌早見表"],
+  ["https://claudetarouggl-coder.github.io/pet-nenrei/", "犬・猫の年齢換算"],
+  ["https://claudetarouggl-coder.github.io/nemuri-keisan/", "睡眠サイクル計算"],
+];
+const RELATED_NAV = `<p class="related">姉妹サイト: ${RELATED_SITES.filter(([u]) => u !== BASE)
+  .map(([u, n]) => `<a href="${u}" rel="noopener">${n}</a>`).join("・")}</p>`;
 const GA_ID = "G-P6NLJ3XZ7R";
 const OUT = path.join(__dirname, "docs");
 
@@ -230,6 +244,7 @@ ${bcNav}
 ${body}
 <footer>
 六曜・旧暦は当サイト独自の天文計算によるもので、朔の日付は国立天文台の暦要項（2026年・2027年）と照合済みです。六曜は伝統的な暦注であり科学的根拠はありません。冠婚葬祭の判断は参考程度にご利用ください。
+${RELATED_NAV}
 </footer>
 </main>
 ${extraScript}
