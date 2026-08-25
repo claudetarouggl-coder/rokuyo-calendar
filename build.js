@@ -1,13 +1,14 @@
 "use strict";
 // 六曜カレンダー 静的サイトジェネレータ
-// 生成物: docs/ 以下に index.html + 月別17ページ + 大安一覧2ページ + ガイド3本 + sitemap.xml + 404.html
+// 生成物: docs/ 以下に計40ページ（index + 月別 + 六曜別年別一覧 + 暦注ページ群 + ガイド）+ sitemap.xml + 404.html
+//   ページ数はビルド末尾の assert で管理。内訳はそちらを正とする
 const fs = require("fs");
 const path = require("path");
 const { makeConverter } = require("./lib/kyureki");
-const { isIchiryumanbai, isTenshabi } = require("./lib/kanshi");
+const { isIchiryumanbai, isTenshabi, dayKanshi } = require("./lib/kanshi");
 const { isFujoju } = require("./lib/fujoju");
 const { holidaysOf } = require("./lib/shukujitsu");
-const { GOODS, MOON_GOODS, SAIKYOBI_GOODS, NENGAJO_GOODS } = require("./lib/affiliates");
+const { GOODS, MOON_GOODS, SAIKYOBI_GOODS, NENGAJO_GOODS, INUNOHI_GOODS } = require("./lib/affiliates");
 
 const BASE = "https://claudetarouggl-coder.github.io/rokuyo-calendar/";
 // 姉妹サイト相互リンク（自サイトは除外）
@@ -52,6 +53,7 @@ const meigetsuPath = "meigetsu/";
 const saikyobiPath = "saikyobi/";
 const shukujitsuPath = "shukujitsu/";
 const nengajoPath = "nengajo/";
+const inunohiPath = "inunohi/";
 const daysInMonth = (y, m) => new Date(Date.UTC(y, m, 0)).getUTCDate();
 const wdayOf = (y, m, d) => new Date(Date.UTC(y, m - 1, d)).getUTCDay();
 const lunarStrOf = c => `旧暦${c.leap ? "閏" : ""}${c.month}月${c.day}日`;
@@ -133,6 +135,35 @@ const saikyobiFujojuOverlapGot = [];
 for (const y of [2026, 2027]) for (const it of SAIKYOBI_BY_YEAR[y]) if (it.fujoju) saikyobiFujojuOverlapGot.push([y, it.m, it.d]);
 if (JSON.stringify(saikyobiFujojuOverlapGot) !== JSON.stringify(SAIKYOBI_FUJOJU_OVERLAP_EXPECTED)) {
   throw new Error(`saikyobi fujoju overlap mismatch: got ${JSON.stringify(saikyobiFujojuOverlapGot)}, want ${JSON.stringify(SAIKYOBI_FUJOJU_OVERLAP_EXPECTED)}`);
+}
+
+// 戌の日（安産祈願・帯祝い）一覧（年別）: 日の干支が「戌」の日を全日走査
+const INUNOHI_BY_YEAR = {};
+for (const y of [2026, 2027]) {
+  INUNOHI_BY_YEAR[y] = [];
+  for (let m = 1; m <= 12; m++) {
+    const last = daysInMonth(y, m);
+    for (let d = 1; d <= last; d++) {
+      if (dayKanshi(y, m, d).shi === "戌") {
+        INUNOHI_BY_YEAR[y].push({ m, d, wday: wdayOf(y, m, d), rokuyo: conv(y, m, d).rokuyo });
+      }
+    }
+  }
+}
+// 事前検証済みの正解（外部公表カレンダー2ソースと照合済み）と一致するかを検証する
+const INUNOHI_EXPECTED = {
+  2026: [[1, 12], [1, 24], [2, 5], [2, 17], [3, 1], [3, 13], [3, 25], [4, 6], [4, 18], [4, 30],
+    [5, 12], [5, 24], [6, 5], [6, 17], [6, 29], [7, 11], [7, 23], [8, 4], [8, 16], [8, 28],
+    [9, 9], [9, 21], [10, 3], [10, 15], [10, 27], [11, 8], [11, 20], [12, 2], [12, 14], [12, 26]],
+  2027: [[1, 7], [1, 19], [1, 31], [2, 12], [2, 24], [3, 8], [3, 20], [4, 1], [4, 13], [4, 25],
+    [5, 7], [5, 19], [5, 31], [6, 12], [6, 24], [7, 6], [7, 18], [7, 30], [8, 11], [8, 23],
+    [9, 4], [9, 16], [9, 28], [10, 10], [10, 22], [11, 3], [11, 15], [11, 27], [12, 9], [12, 21]],
+};
+for (const y of [2026, 2027]) {
+  const got = INUNOHI_BY_YEAR[y].map(it => [it.m, it.d]);
+  if (JSON.stringify(got) !== JSON.stringify(INUNOHI_EXPECTED[y])) {
+    throw new Error(`inunohi mismatch for ${y}: got ${JSON.stringify(got)}, want ${JSON.stringify(INUNOHI_EXPECTED[y])}`);
+  }
 }
 
 // 月別ページに「この月の最強開運日」マーカーを出すための逆引きマップ
@@ -278,6 +309,7 @@ const guideLinks = depth => `<h2>あわせて読む</h2><div class="links">
 <a href="${rel(depth, "fujojubi/")}">不成就日とは？由来と8日周期のルール</a>
 <a href="${rel(depth, meigetsuPath)}">中秋の名月はいつ？十五夜・十三夜の日付</a>
 <a href="${rel(depth, saikyobiPath)}">最強開運日はいつ？天赦日と一粒万倍日が重なる日</a>
+<a href="${rel(depth, inunohiPath)}">戌の日カレンダー｜安産祈願の日取り</a>
 <a href="${rel(depth, shukujitsuPath)}">祝日カレンダー｜振替休日・連休一覧</a>
 <a href="${rel(depth, nengajoPath)}">年賀状はいつまで？喪中はがき・寒中見舞いの時期</a></div>`;
 
@@ -722,6 +754,54 @@ ${guideLinks(1)}`;
   }));
 }
 
+// ---- 戌の日カレンダー（安産祈願）ページ ----
+function buildInunohiGuide() {
+  const monthPublished = (y, m) => MONTHS.some(mo => mo.y === y && mo.m === m);
+  const yearTable = y => {
+    const rows = INUNOHI_BY_YEAR[y].map(it => {
+      const label = `${it.m}月${it.d}日(${WDAYS[it.wday]})`;
+      const dateCell = monthPublished(y, it.m) ? `<a href="${rel(1, monthPath(y, it.m))}">${label}</a>` : label;
+      const cls = [it.wday === 6 ? "sat" : it.wday === 0 ? "sun" : "", it.rokuyo === "大安" ? "taian" : ""]
+        .filter(Boolean).join(" ");
+      return `<tr class="${cls}"><td>${dateCell}</td><td>${esc(it.rokuyo)}</td></tr>`;
+    }).join("\n");
+    return `<h2>${y}年の戌の日一覧（${INUNOHI_BY_YEAR[y].length}日）</h2><div class="tbl"><table><thead><tr><th>日付(曜日)</th><th>六曜</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  };
+
+  const taianOverlap = y => INUNOHI_BY_YEAR[y].filter(it => it.rokuyo === "大安");
+  const overlap2026 = taianOverlap(2026), overlap2027 = taianOverlap(2027);
+  const fmtList = list => list.map(it => `${it.m}月${it.d}日(${WDAYS[it.wday]})`).join("・");
+
+  const body = `
+<section class="feature"><p>戌の日は、日ごとに割り当てられた十二支が「戌」にあたる日のことです。犬はお産が軽く多産であることから安産の象徴とされ、妊娠5ヶ月目に入って最初の戌の日に腹帯（岩田帯）を巻いて安産を祈願する「帯祝い」という習わしがあります。十二支は12日周期で巡るため、戌の日もおよそ12日に1度訪れます。大安と重なる日は下表で色をつけています。</p></section>
+${yearTable(2026)}
+${yearTable(2027)}
+<h2>帯祝いのタイミングは体調優先で</h2>
+<p>帯祝いの目安は「妊娠5ヶ月目に入って最初の戌の日」とされていますが、必ずこの日に行わなければならない決まりではありません。つわりや体調不良がある場合は無理をせず、体調が落ち着いてから別の戌の日、あるいは戌の日以外の日に行っても問題ないとされています。</p>
+<h2>六曜と戌の日は関係ある？</h2>
+<p>六曜（大安・仏滅など）と戌の日は、由来も決まり方も異なる別々の暦の仕組みです。そのため、仏滅の戌の日に安産祈願をしても差し支えないとされています。とはいえ、大安と戌の日が重なる日は縁起が良いと考える方も多く、気になる場合は上表の大安と重なる日を目安にするとよいでしょう。2026年は${overlap2026.length ? fmtList(overlap2026) : "該当日がありません"}、2027年は${overlap2027.length ? fmtList(overlap2027) : "該当日がありません"}が大安と重なる戌の日です。</p>
+<h2>安産祈願の流れ</h2>
+<p>安産祈願は、神社で祈祷を受けるのが一般的な形の一つとされています。祈祷の初穂料（祈祷料）の相場は5千円〜1万円程度とされることが多いですが、神社によって異なるため事前に確認しておくと安心です。腹帯を持参できる神社もあれば、祈祷後に腹帯を授与してくれる神社もあるとされ、事前に問い合わせておくとスムーズです。</p>
+${affiliateBlock(INUNOHI_GOODS, "安産祈願・帯祝いに用意したいもの")}
+<section class="faq"><h2>よくある質問</h2><dl>
+<dt>戌の日は誰と行く？</dt><dd>夫婦で行く方が多いとされていますが、実家の親と一緒に行く方や妊婦一人で行く方など、家庭によってさまざまとされています。決まりはないため、都合の良いメンバーで参拝して問題ないとされています。</dd>
+<dt>腹帯は必須？</dt><dd>腹帯（岩田帯）を巻くかどうかは地域や家庭の慣習によって異なり、最近ではさらしタイプの伝統的な腹帯ではなく、マタニティベルトなど普段使いしやすいアイテムを選ぶ方も増えているとされています。必須ではなく、体調やライフスタイルにあわせて選んでよいとされています。</dd>
+<dt>戌の日を過ぎてしまったら？</dt><dd>妊娠5ヶ月目の戌の日を過ぎても、安産祈願自体に期限はないとされています。次の戌の日にあらためて参拝する方や、戌の日にこだわらず都合の良い日に参拝する方も多いとされています。</dd>
+</dl></section>
+<h2>大安の日取りをあわせてチェック</h2>
+${taianLinks(1)}
+${guideLinks(1)}`;
+
+  writePage(`${inunohiPath}index.html`, shell({
+    path: inunohiPath, depth: 1,
+    title: "戌の日カレンダー2026・2027｜安産祈願はいつ？大安と重なる日は",
+    desc: "2026年・2027年の戌の日（安産祈願・帯祝いの目安）を一覧掲載。大安と重なる日にも印をつけています。妊娠5ヶ月目の帯祝いのタイミング、六曜との関係、安産祈願の流れをわかりやすく解説します。",
+    h1: "戌の日カレンダー｜安産祈願はいつ？",
+    breadcrumbs: [{ name: "六曜カレンダー", path: "" }, { name: "戌の日カレンダー", path: inunohiPath }],
+    body,
+  }));
+}
+
 // ---- 祝日カレンダーページ ----
 function buildShukujitsuGuide() {
   const monthPublished = (y, m) => MONTHS.some(mo => mo.y === y && mo.m === m);
@@ -1033,6 +1113,7 @@ buildFujojuPage(2027);
 buildFujojuGuide();
 buildMeigetsuGuide();
 buildSaikyobiGuide();
+buildInunohiGuide();
 buildShukujitsuGuide();
 buildNengajoGuide();
 buildGuides();
@@ -1046,7 +1127,7 @@ for (const t of linkTargets) {
   const f = path.join(OUT, t, "index.html");
   if (!fs.existsSync(f)) throw new Error(`BROKEN LINK TARGET: ${t}`);
 }
-const expected = 1 + ALL_MONTHS_DATA.length + 2 + 4 + 4 + 3 + 1 + 1 + 1 + 1 + 4; // home + 月別17 + 大安一覧2 + 仏滅/友引一覧4 + 一粒万倍日/天赦日4 + 不成就日3(解説+年別2) + 中秋の名月1 + 最強開運日1 + 祝日カレンダー1 + 年賀状ガイド1 + ガイド4
+const expected = 1 + ALL_MONTHS_DATA.length + 2 + 4 + 4 + 3 + 1 + 1 + 1 + 1 + 1 + 4; // home + 月別17 + 大安一覧2 + 仏滅/友引一覧4 + 一粒万倍日/天赦日4 + 不成就日3(解説+年別2) + 中秋の名月1 + 最強開運日1 + 戌の日カレンダー1 + 祝日カレンダー1 + 年賀状ガイド1 + ガイド4
 if (emittedUrls.length !== expected) throw new Error(`page count ${emittedUrls.length} != ${expected}`);
 if (!emittedUrls.every(u => u.startsWith(BASE))) throw new Error("URL outside BASE");
 console.log(`OK: ${emittedUrls.length} pages + 404 + sitemap generated for ${TODAY_STR}`);
