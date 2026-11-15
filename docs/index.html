@@ -48,7 +48,7 @@ footer{margin:2rem 0 1rem;color:#8a7a6c;font-size:.75rem;text-align:center;line-
 
 <h1>六曜カレンダー</h1>
 
-<section class="today" id="today-card"><div class="lb">今日（2026年11月14日）の六曜</div><div class="vl" id="today-rokuyo">先負</div><div class="lb">旧暦10月6日・詳しくは<a href="2026/11/">2026年11月のカレンダー</a></div></section>
+<section class="today" id="today-card"><div class="lb">今日（2026年11月15日）の六曜</div><div class="vl" id="today-rokuyo">仏滅</div><div class="lb">旧暦10月7日・詳しくは<a href="2026/11/">2026年11月のカレンダー</a></div></section>
 <section class="feature"><p>六曜（大安・友引・先勝・先負・仏滅・赤口）と旧暦を、2026年8月〜2027年12月の期間で日別に確認できるカレンダーサイトです。結婚式・入籍・納車・引っ越しなど、日取りを選ぶ際の参考にご利用ください。</p></section>
 <h2>月別カレンダー</h2>
 <h3>2026年</h3><div class="links"><a href="2026/08/">8月</a><a href="2026/09/">9月</a><a href="2026/10/">10月</a><a href="2026/11/">11月</a><a href="2026/12/">12月</a></div>
@@ -97,7 +97,7 @@ var MONTH_URL="https://claudetarouggl-coder.github.io/rokuyo-calendar/";
   var now=new Date(Date.now()+540*60000);
   var y=now.getUTCFullYear(),m=now.getUTCMonth()+1,d=now.getUTCDate();
   var key=y+"-"+m+"-"+d;
-  if(key==="2026-11-14")return; // ビルド当日はサーバー描画（旧暦つき）のまま
+  if(key==="2026-11-15")return; // ビルド当日はサーバー描画（旧暦つき）のまま
   var card=document.getElementById("today-card");
   if(!card)return;
   if(Object.prototype.hasOwnProperty.call(ROKUYO_MAP,key)){
